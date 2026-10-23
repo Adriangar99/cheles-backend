@@ -28,7 +28,7 @@ listed in design.md (throttle, `LogIn` order); moved code without new logic is c
 
 ## 5. Documentation and verification
 
-- [ ] 5.1 Add an "Architecture" section to `README.md` describing the context layout, the composition root and the import contracts, using identity as the reference; verify the paths it names exist
+- [x] 5.1 Add an "Architecture" section to `README.md` describing the context layout, the composition root and the import contracts, using identity as the reference; verify the paths it names exist
 - [ ] 5.2 Run `docker compose up -d --build`; verify the API starts, `http://127.0.0.1:3000/api/auth/me` returns 401 «No autenticado» through the web app, and CI passes on the pull request
 
 ## Workflow follow-up
