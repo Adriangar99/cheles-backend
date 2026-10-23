@@ -13,7 +13,7 @@ import pyotp
 import qrcode
 from sqlalchemy import delete
 
-from app.db import Base, SessionLocal, engine
+from app.db import SessionLocal
 from app.migrate import migrate
 from app.models import LoginSession, User
 from app.security import hash_password
@@ -29,7 +29,7 @@ def create_user(username: str) -> None:
     secret = pyotp.random_base32()
     uri = pyotp.TOTP(secret).provisioning_uri(name=username, issuer_name="Cheles")
 
-    Base.metadata.create_all(engine)
+    migrate()
     with SessionLocal() as db:
         db.execute(delete(LoginSession))
         db.execute(delete(User))

@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session, joinedload
 from app import stats
 from app.categorize import seed_categories
 from app.config import get_settings
-from app.db import Base, SessionLocal, engine, get_db
+from app.db import SessionLocal, get_db
 from app.enablebanking import EnableBankingClient, EnableBankingError
 from app.models import (
     Account,
@@ -50,7 +50,6 @@ def scheduled_sync() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    Base.metadata.create_all(engine)
     with SessionLocal() as db:
         seed_categories(db)
     scheduler = BackgroundScheduler()

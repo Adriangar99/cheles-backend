@@ -186,6 +186,27 @@ def test_schema_equivalence(postgres: PostgresContainer, new_database: Callable[
     assert "CREATE TABLE public.transactions" in schema_dump(postgres, migrated)
 
 
+def test_create_user_migrates_an_empty_database(scratch_database_url: str, tmp_path: Path) -> None:
+    """`create-user` works on a database without schema, creating it through the migrations."""
+    result = subprocess.run(
+        [sys.executable, "-m", "app.cli", "create-user", "ana"],
+        cwd=tmp_path,
+        env={"PATH": os.environ["PATH"], "PYTHONPATH": str(ROOT), "DATABASE_URL": scratch_database_url},
+        input="correct horse battery\ncorrect horse battery\n",
+        capture_output=True,
+        text=True,
+        timeout=60,
+        start_new_session=True,  # no controlling terminal, so getpass reads the password from stdin
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert schema_version(scratch_database_url) == "0001_baseline"
+    engine = create_engine(scratch_database_url)
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT username FROM users")).scalars().all() == ["ana"]
+    engine.dispose()
+
+
 def test_health_check(client: TestClient) -> None:
     """Scenario: Health check"""
     response = client.get("/api/health")
