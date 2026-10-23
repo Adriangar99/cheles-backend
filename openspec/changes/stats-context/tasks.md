@@ -20,7 +20,7 @@ written first for the stats aggregation rules, which are rewritten from SQL to P
 ## 4. Documentation and verification
 
 - [x] 4.1 Update the README architecture section (all contexts migrated, read models published by owners, no exceptions or service locator) and `openspec/config.yaml`'s architecture context (migration complete); verify the paths named exist
-- [ ] 4.2 Run `docker compose up -d --build`; verify the API starts, `/api/stats/summary` returns 401 without a session through the web app, and CI passes on the pull request
+- [x] 4.2 Run `docker compose up -d --build`; verify the API starts, `/api/stats/summary` returns 401 without a session through the web app, and CI passes on the pull request
 
 ## Workflow follow-up
 
