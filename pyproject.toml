@@ -82,6 +82,7 @@ containers = [
     "app.categorization",
     "app.transactions",
     "app.banking",
+    "app.stats",
 ]
 layers = ["public", "infrastructure", "application", "domain"]
 
@@ -97,6 +98,8 @@ source_modules = [
     "app.transactions.application",
     "app.banking.domain",
     "app.banking.application",
+    "app.stats.domain",
+    "app.stats.application",
 ]
 forbidden_modules = [
     "fastapi",
@@ -119,11 +122,12 @@ source_modules = [
     "app.categorization",
     "app.transactions",
     "app.banking",
+    "app.stats",
 ]
 forbidden_modules = [
     "app.main",
     "app.cli",
-    "app.stats",
+    "app.legacy_stats",
 ]
 
 [[tool.importlinter.contracts]]
@@ -133,7 +137,7 @@ type = "forbidden"
 source_modules = [
     "app.main",
     "app.cli",
-    "app.stats",
+    "app.legacy_stats",
 ]
 forbidden_modules = [
     "app.identity.domain",
@@ -148,13 +152,13 @@ forbidden_modules = [
     "app.banking.domain",
     "app.banking.application",
     "app.banking.infrastructure",
+    "app.stats.domain",
+    "app.stats.application",
+    "app.stats.infrastructure",
 ]
 allow_indirect_imports = true
-# Transitional, read-only: stats aggregates other contexts' tables until stats becomes its own read model
-ignore_imports = [
-    "app.stats -> app.banking.infrastructure.orm",
-    "app.stats -> app.transactions.infrastructure.orm",
-]
+# Transitional, read-only: removed together with app/legacy_stats.py in this change
+ignore_imports = ["app.legacy_stats -> app.banking.infrastructure.orm", "app.legacy_stats -> app.transactions.infrastructure.orm"]
 
 [[tool.importlinter.contracts]]
 name = "Identity uses other contexts only through their public API"
@@ -170,6 +174,9 @@ forbidden_modules = [
     "app.banking.domain",
     "app.banking.application",
     "app.banking.infrastructure",
+    "app.stats.domain",
+    "app.stats.application",
+    "app.stats.infrastructure",
 ]
 allow_indirect_imports = true
 
@@ -187,6 +194,9 @@ forbidden_modules = [
     "app.banking.domain",
     "app.banking.application",
     "app.banking.infrastructure",
+    "app.stats.domain",
+    "app.stats.application",
+    "app.stats.infrastructure",
 ]
 allow_indirect_imports = true
 
@@ -204,6 +214,9 @@ forbidden_modules = [
     "app.banking.domain",
     "app.banking.application",
     "app.banking.infrastructure",
+    "app.stats.domain",
+    "app.stats.application",
+    "app.stats.infrastructure",
 ]
 allow_indirect_imports = true
 
@@ -221,6 +234,29 @@ forbidden_modules = [
     "app.transactions.domain",
     "app.transactions.application",
     "app.transactions.infrastructure",
+    "app.stats.domain",
+    "app.stats.application",
+    "app.stats.infrastructure",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Stats uses other contexts only through their public API"
+type = "forbidden"
+source_modules = ["app.stats"]
+forbidden_modules = [
+    "app.identity.domain",
+    "app.identity.application",
+    "app.identity.infrastructure",
+    "app.categorization.domain",
+    "app.categorization.application",
+    "app.categorization.infrastructure",
+    "app.transactions.domain",
+    "app.transactions.application",
+    "app.transactions.infrastructure",
+    "app.banking.domain",
+    "app.banking.application",
+    "app.banking.infrastructure",
 ]
 allow_indirect_imports = true
 
@@ -233,10 +269,11 @@ forbidden_modules = [
     "app.categorization",
     "app.transactions",
     "app.banking",
+    "app.stats",
     "app.bootstrap",
     "app.main",
     "app.cli",
-    "app.stats",
+    "app.legacy_stats",
     "fastapi",
     "starlette",
     "pydantic",

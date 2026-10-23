@@ -9,7 +9,7 @@ written first for the stats aggregation rules, which are rewritten from SQL to P
 
 ## 2. Stats domain and application
 
-- [ ] 2.1 Create `app/stats/` and add it to the import contracts; write failing unit tests for the aggregation rules (counted filter, monthly summary, savings incl. withdrawals, spending by category order and uncategorized group, history latest N chronological without empty months, balances by role), then implement `app/stats/domain/`; verify the tests, mypy and `lint-imports` pass
+- [x] 2.1 Create `app/stats/` and add it to the import contracts; write failing unit tests for the aggregation rules (counted filter, monthly summary, savings incl. withdrawals, spending by category order and uncategorized group, history latest N chronological without empty months, balances by role), then implement `app/stats/domain/`; verify the tests, mypy and `lint-imports` pass
 - [ ] 2.2 Add the ports and the `MonthlySummary` and `MonthlyHistory` use cases; verify mypy and `lint-imports` pass
 
 ## 3. Infrastructure, composition and cleanup

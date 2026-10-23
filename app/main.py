@@ -9,7 +9,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app import stats
+from app import legacy_stats as stats
 from app.bootstrap import Container, current, wire
 from app.categorization.public import UnknownCategory
 from app.config import get_settings
