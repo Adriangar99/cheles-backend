@@ -20,8 +20,9 @@ Both repos share the Compose project name `cheles`, so `api`, `db` and `web` sho
 
 ## Architecture
 
-DDD with a hexagonal architecture per bounded context, migrated incrementally. `identity` is the reference; the
-other contexts (banking, transactions, categorization, stats) still live in the flat legacy modules of `app/`.
+DDD with a hexagonal architecture per bounded context, migrated incrementally. `identity` and `categorization` are
+migrated (identity is the reference); banking, transactions and stats still live in the flat legacy modules of
+`app/`.
 
     app/identity/
       domain/           # entities, value objects and rules; plain Python, no frameworks
@@ -33,9 +34,12 @@ other contexts (banking, transactions, categorization, stats) still live in the 
 - Domain entities are dataclasses; ORM rows live in `infrastructure/orm.py` and repositories translate between them.
 - FastAPI routes depend on placeholder providers that `bootstrap.wire(app, container)` overrides, so tests can wire
   their own `Container` (e.g. with a fake clock).
+- Legacy modules that need a context outside an HTTP request (startup seeding, sync, stats) get its services from
+  `bootstrap.current()`. This service locator is transitional: contexts never use it, and each use disappears when
+  that legacy consumer becomes a context.
 - `uv run lint-imports` enforces the rules (see `[tool.importlinter]` in `pyproject.toml`): layers only depend
-  downwards, domain and application import no frameworks, a context never imports legacy modules, and legacy code
-  reaches a context only through its `public.py`.
+  downwards, domain and application import no frameworks, a context never imports legacy modules, and both legacy
+  code and other contexts reach a context only through its `public.py`.
 
 ## Development
 

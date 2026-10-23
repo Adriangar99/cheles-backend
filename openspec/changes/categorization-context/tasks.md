@@ -18,7 +18,7 @@ rewritten; moved code is covered by the characterization tests. Commit before an
 
 ## 3. Documentation and verification
 
-- [ ] 3.1 Update the README architecture section (categorization migrated, `bootstrap.current()` as a transitional accessor for legacy code) and the import-contracts description; verify the paths it names exist
+- [x] 3.1 Update the README architecture section (categorization migrated, `bootstrap.current()` as a transitional accessor for legacy code) and the import-contracts description; verify the paths it names exist
 - [ ] 3.2 Run `docker compose up -d --build`; verify the API starts and `/api/categories` returns 401 without a session through the web app, and CI passes on the pull request
 
 ## Workflow follow-up
