@@ -125,3 +125,24 @@ type = "forbidden"
 source_modules = ["app.identity"]
 forbidden_modules = ["app.categorization.domain", "app.categorization.application", "app.categorization.infrastructure"]
 allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "The shared kernel depends on nothing else in the app nor on frameworks"
+type = "forbidden"
+source_modules = ["app.shared"]
+forbidden_modules = [
+    "app.identity",
+    "app.categorization",
+    "app.bootstrap",
+    "app.main",
+    "app.cli",
+    "app.models",
+    "app.sync",
+    "app.stats",
+    "app.enablebanking",
+    "fastapi",
+    "starlette",
+    "pydantic",
+    "sqlalchemy",
+    "httpx",
+]
