@@ -9,6 +9,7 @@ from app.banking.application.use_cases import BankingServices, ConnectionView
 from app.banking.domain.account import Account
 from app.banking.domain.errors import AccountNotFound, ConnectionNotFound, ProviderError
 from app.config import get_settings
+from app.http_types import JsonDateTime, JsonDecimal
 from app.identity.public import AuthenticatedUser, require_user
 from app.shared.ids import AccountId
 
@@ -44,6 +45,52 @@ def _serialize_connection(view: ConnectionView) -> dict[str, Any]:
     }
 
 
+class AccountOut(BaseModel):
+    id: int
+    name: str
+    iban_tail: str | None
+    currency: str
+    role: Literal["main", "savings", "excluded"]
+    balance: JsonDecimal | None
+    balance_at: JsonDateTime | None
+    connection_id: int | None
+
+
+class ConnectionOut(BaseModel):
+    id: int
+    bank: str
+    status: Literal["active", "expired", "revoked"]
+    valid_until: JsonDateTime
+    last_synced_at: JsonDateTime | None
+    last_error: str | None
+    accounts: list[AccountOut]
+
+
+class BanksOut(BaseModel):
+    connections: list[ConnectionOut]
+    detached_accounts: list[AccountOut]
+
+
+class AvailableBankOut(BaseModel):
+    name: str
+    country: str
+    logo: str | None
+
+
+class AuthorizationUrlOut(BaseModel):
+    url: str
+
+
+class SyncOut(BaseModel):
+    new: int
+    status: Literal["active", "expired", "revoked"]
+    error: str | None
+
+
+class SyncAllOut(BaseModel):
+    new: int
+
+
 def _provider_failure(error: ProviderError) -> HTTPException:
     return HTTPException(502, f"Enable Banking: {error.body}")
 
@@ -51,7 +98,7 @@ def _provider_failure(error: ProviderError) -> HTTPException:
 router = APIRouter()
 
 
-@router.get("/api/banks", response_model=None)
+@router.get("/api/banks", response_model=BanksOut)
 def list_banks(
     services: BankingServices = Depends(banking_services), _: AuthenticatedUser = Depends(require_user)
 ) -> dict[str, Any]:
@@ -62,7 +109,7 @@ def list_banks(
     }
 
 
-@router.get("/api/banks/available", response_model=None)
+@router.get("/api/banks/available", response_model=list[AvailableBankOut])
 def available_banks(
     services: BankingServices = Depends(banking_services), _: AuthenticatedUser = Depends(require_user)
 ) -> list[dict[str, Any]]:
@@ -77,7 +124,7 @@ class ConnectBody(BaseModel):
     country: str = get_settings().eb_country
 
 
-@router.post("/api/banks/connect", response_model=None)
+@router.post("/api/banks/connect", response_model=AuthorizationUrlOut)
 def connect_bank(
     body: ConnectBody,
     services: BankingServices = Depends(banking_services),
@@ -101,7 +148,7 @@ def bank_callback(
     return Response(status_code=303, headers={"Location": f"/bancos?{'connected=1' if connected else 'error=1'}"})
 
 
-@router.post("/api/banks/{connection_id}/sync", response_model=None)
+@router.post("/api/banks/{connection_id}/sync", response_model=SyncOut)
 def sync_one(
     connection_id: int,
     services: BankingServices = Depends(banking_services),
@@ -114,7 +161,7 @@ def sync_one(
     return {"new": result.new, "status": result.status, "error": result.error}
 
 
-@router.post("/api/sync", response_model=None)
+@router.post("/api/sync", response_model=SyncAllOut)
 def sync_everything(
     services: BankingServices = Depends(banking_services), _: AuthenticatedUser = Depends(require_user)
 ) -> dict[str, Any]:
@@ -127,7 +174,7 @@ class AccountPatch(BaseModel):
     iban: str | None = None
 
 
-@router.patch("/api/accounts/{account_id}", response_model=None)
+@router.patch("/api/accounts/{account_id}", response_model=AccountOut)
 def patch_account(
     account_id: int,
     body: AccountPatch,

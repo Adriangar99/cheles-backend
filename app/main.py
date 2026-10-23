@@ -45,12 +45,20 @@ app = FastAPI(title="Cheles", lifespan=lifespan, docs_url=None, redoc_url=None, 
 wire(app, Container.from_environment())
 
 
+class ProcessedOut(BaseModel):
+    processed: int
+
+
+class OkOut(BaseModel):
+    ok: bool
+
+
 class RuleBody(BaseModel):
     pattern: str
     category_id: int
 
 
-@app.post("/api/rules", response_model=None)
+@app.post("/api/rules", response_model=ProcessedOut)
 def create_rule(body: RuleBody, request: Request, _: AuthenticatedUser = Depends(require_user)) -> dict[str, Any]:
     """Creates a high-priority rule in categorization, then reprocesses transactions so it applies to the history."""
     container: Container = request.app.state.container
@@ -61,6 +69,6 @@ def create_rule(body: RuleBody, request: Request, _: AuthenticatedUser = Depends
     return {"processed": container.transactions().reprocess_all()}
 
 
-@app.get("/api/health", response_model=None)
+@app.get("/api/health", response_model=OkOut)
 def health() -> dict[str, Any]:
     return {"ok": True}
