@@ -36,6 +36,19 @@ class AccountStanding:
 
 
 @dataclass(frozen=True)
+class SpendingLabel:
+    """How a spending category is shown."""
+
+    name: str
+    icon: str
+    color: str
+
+
+# Spending without a category (a stats presentation choice)
+UNCATEGORIZED = SpendingLabel(name="Sin categoría", icon="•", color="#8a8a8a")
+
+
+@dataclass(frozen=True)
 class CategorySpending:
     category_id: CategoryId | None
     amount: Decimal  # positive
