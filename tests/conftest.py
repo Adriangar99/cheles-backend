@@ -24,10 +24,10 @@ from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
+from app.bootstrap import Container, wire  # noqa: E402
 from app.categorize import seed_categories  # noqa: E402
 from app.db import SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
-from app.security import login_throttle  # noqa: E402
 from tests.fakes import FakeEnableBanking  # noqa: E402
 from tests.helpers import ClientIpFromHeader, migrate_to_head  # noqa: E402
 
@@ -53,13 +53,20 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
 
 
 @pytest.fixture(autouse=True)
+def container() -> Container:
+    """A fresh composition root per test (e.g. no login failures recorded); tests may rewire with their own."""
+    fresh = Container.from_environment()
+    wire(app, fresh)
+    return fresh
+
+
+@pytest.fixture(autouse=True)
 def clean_database() -> None:
-    """Every test starts from an empty database with the default categories, and no login failures recorded."""
+    """Every test starts from an empty database with the default categories."""
     with engine.begin() as connection:
         connection.execute(text(f"TRUNCATE {', '.join(APP_TABLES)} RESTART IDENTITY CASCADE"))
     with SessionLocal() as db:
         seed_categories(db)
-    login_throttle._failures.clear()
 
 
 @pytest.fixture

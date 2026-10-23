@@ -6,16 +6,18 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from pydantic import BaseModel
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app import stats
+from app.bootstrap import Container, wire
 from app.categorize import seed_categories
 from app.config import get_settings
 from app.db import SessionLocal, get_db
 from app.enablebanking import EnableBankingClient, EnableBankingError
+from app.identity.public import AuthenticatedUser, require_user
 from app.models import (
     Account,
     BankConnection,
@@ -23,16 +25,6 @@ from app.models import (
     PendingAuth,
     Rule,
     Transaction,
-    User,
-)
-from app.security import (
-    COOKIE_NAME,
-    create_login_session,
-    current_user,
-    destroy_login_session,
-    login_throttle,
-    verify_password,
-    verify_totp,
 )
 from app.sync import normalize_iban, reprocess_all, sync_all, sync_connection
 
@@ -60,54 +52,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Cheles", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
-
-
-# ---------- Auth ----------
-
-
-class LoginBody(BaseModel):
-    username: str
-    password: str
-    code: str
-
-
-@app.post("/api/auth/login", response_model=None)
-def login(body: LoginBody, request: Request, response: Response, db: Session = Depends(get_db)) -> dict[str, Any]:
-    ip = request.client.host if request.client else "unknown"
-    login_throttle.check(ip)
-    user = db.scalar(select(User).where(User.username == body.username))
-    # Se comprueba todo siempre, para no dar pistas de qué falló
-    if user is None or not (
-        verify_password(user.password_hash, body.password) and verify_totp(user.totp_secret, body.code)
-    ):
-        login_throttle.fail(ip)
-        raise HTTPException(401, "Datos incorrectos")
-    login_throttle.reset(ip)
-    token, expires_at = create_login_session(db, user)
-    response.set_cookie(
-        COOKIE_NAME,
-        token,
-        expires=expires_at,
-        httponly=True,
-        secure=settings.cookie_secure,
-        samesite="lax",
-        path="/",
-    )
-    return {"ok": True}
-
-
-@app.post("/api/auth/logout", response_model=None)
-def logout(request: Request, response: Response, db: Session = Depends(get_db)) -> dict[str, Any]:
-    token = request.cookies.get(COOKIE_NAME)
-    if token:
-        destroy_login_session(db, token)
-    response.delete_cookie(COOKIE_NAME, path="/")
-    return {"ok": True}
-
-
-@app.get("/api/auth/me", response_model=None)
-def me(user: User = Depends(current_user)) -> dict[str, Any]:
-    return {"username": user.username}
+wire(app, Container.from_environment())
 
 
 # ---------- Bancos ----------
@@ -139,7 +84,7 @@ def serialize_connection(c: BankConnection) -> dict[str, Any]:
 
 
 @app.get("/api/banks", response_model=None)
-def list_banks(db: Session = Depends(get_db), _: User = Depends(current_user)) -> dict[str, Any]:
+def list_banks(db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_user)) -> dict[str, Any]:
     connections = (
         db.scalars(select(BankConnection).options(joinedload(BankConnection.accounts)).order_by(BankConnection.id))
         .unique()
@@ -153,7 +98,7 @@ def list_banks(db: Session = Depends(get_db), _: User = Depends(current_user)) -
 
 
 @app.get("/api/banks/available", response_model=None)
-def available_banks(_: User = Depends(current_user)) -> list[dict[str, Any]]:
+def available_banks(_: AuthenticatedUser = Depends(require_user)) -> list[dict[str, Any]]:
     try:
         aspsps = EnableBankingClient().list_aspsps(settings.eb_country)
     except EnableBankingError as e:
@@ -167,7 +112,9 @@ class ConnectBody(BaseModel):
 
 
 @app.post("/api/banks/connect", response_model=None)
-def connect_bank(body: ConnectBody, db: Session = Depends(get_db), _: User = Depends(current_user)) -> dict[str, Any]:
+def connect_bank(
+    body: ConnectBody, db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_user)
+) -> dict[str, Any]:
     state = secrets.token_urlsafe(24)
     db.add(PendingAuth(state=state, aspsp_name=body.name, aspsp_country=body.country))
     db.commit()
@@ -185,7 +132,7 @@ def bank_callback(
     state: str | None = None,
     error: str | None = None,
     db: Session = Depends(get_db),
-    _: User = Depends(current_user),
+    _: AuthenticatedUser = Depends(require_user),
 ) -> Response:
     def redirect(query: str) -> Response:
         return Response(status_code=303, headers={"Location": f"/bancos?{query}"})
@@ -238,7 +185,9 @@ def bank_callback(
 
 
 @app.post("/api/banks/{connection_id}/sync", response_model=None)
-def sync_one(connection_id: int, db: Session = Depends(get_db), _: User = Depends(current_user)) -> dict[str, Any]:
+def sync_one(
+    connection_id: int, db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_user)
+) -> dict[str, Any]:
     connection = db.get(BankConnection, connection_id)
     if not connection:
         raise HTTPException(404)
@@ -246,12 +195,12 @@ def sync_one(connection_id: int, db: Session = Depends(get_db), _: User = Depend
 
 
 @app.post("/api/sync", response_model=None)
-def sync_everything(db: Session = Depends(get_db), _: User = Depends(current_user)) -> dict[str, Any]:
+def sync_everything(db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_user)) -> dict[str, Any]:
     return {"new": sync_all(db)}
 
 
 @app.post("/api/reprocess", response_model=None)
-def reprocess(db: Session = Depends(get_db), _: User = Depends(current_user)) -> dict[str, Any]:
+def reprocess(db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_user)) -> dict[str, Any]:
     return {"processed": reprocess_all(db)}
 
 
@@ -263,7 +212,7 @@ class AccountPatch(BaseModel):
 
 @app.patch("/api/accounts/{account_id}", response_model=None)
 def patch_account(
-    account_id: int, body: AccountPatch, db: Session = Depends(get_db), _: User = Depends(current_user)
+    account_id: int, body: AccountPatch, db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_user)
 ) -> dict[str, Any]:
     account = db.get(Account, account_id)
     if not account:
@@ -313,7 +262,7 @@ def list_transactions(
     limit: int = Query(100, le=500),
     offset: int = 0,
     db: Session = Depends(get_db),
-    _: User = Depends(current_user),
+    _: AuthenticatedUser = Depends(require_user),
 ) -> list[dict[str, Any]]:
     stmt = select(Transaction).options(joinedload(Transaction.account))
     if month:
@@ -341,7 +290,7 @@ class TxPatch(BaseModel):
 
 @app.patch("/api/transactions/{tx_id}", response_model=None)
 def patch_transaction(
-    tx_id: int, body: TxPatch, db: Session = Depends(get_db), _: User = Depends(current_user)
+    tx_id: int, body: TxPatch, db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_user)
 ) -> dict[str, Any]:
     tx = db.get(Transaction, tx_id)
     if not tx:
@@ -364,7 +313,9 @@ def patch_transaction(
 
 
 @app.get("/api/categories", response_model=None)
-def list_categories(db: Session = Depends(get_db), _: User = Depends(current_user)) -> list[dict[str, Any]]:
+def list_categories(
+    db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_user)
+) -> list[dict[str, Any]]:
     return [
         {"id": c.id, "name": c.name, "kind": c.kind, "icon": c.icon, "color": c.color}
         for c in db.scalars(select(Category).order_by(Category.kind.desc(), Category.name))
@@ -377,7 +328,9 @@ class RuleBody(BaseModel):
 
 
 @app.post("/api/rules", response_model=None)
-def create_rule(body: RuleBody, db: Session = Depends(get_db), _: User = Depends(current_user)) -> dict[str, Any]:
+def create_rule(
+    body: RuleBody, db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_user)
+) -> dict[str, Any]:
     """Crea una regla (con prioridad alta) y reprocesa para aplicarla a todo el histórico."""
     if not db.get(Category, body.category_id):
         raise HTTPException(400, "Categoría inexistente")
@@ -393,14 +346,14 @@ def create_rule(body: RuleBody, db: Session = Depends(get_db), _: User = Depends
 def summary(
     month: str = Query(default_factory=lambda: date.today().strftime("%Y-%m"), pattern=r"^\d{4}-\d{2}$"),
     db: Session = Depends(get_db),
-    _: User = Depends(current_user),
+    _: AuthenticatedUser = Depends(require_user),
 ) -> dict[str, Any]:
     return {**stats.month_summary(db, month), "balances": stats.total_balance(db)}
 
 
 @app.get("/api/stats/history", response_model=None)
 def history(
-    months: int = Query(12, le=60), db: Session = Depends(get_db), _: User = Depends(current_user)
+    months: int = Query(12, le=60), db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_user)
 ) -> list[dict[str, Any]]:
     return stats.monthly_history(db, months)
 

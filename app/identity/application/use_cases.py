@@ -100,3 +100,13 @@ class CreateUser:
             self.uow.users.add(User(username=username, password_hash=self.hasher.hash(password), totp_secret=secret))
             self.uow.commit()
         return Provisioning(secret, self.totp.provisioning_uri(secret, username))
+
+
+@dataclass(frozen=True)
+class IdentityServices:
+    """The identity use cases bound to one unit of work (one request or one CLI run)."""
+
+    log_in: LogIn
+    log_out: LogOut
+    authenticate: Authenticate
+    create_user: CreateUser

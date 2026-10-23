@@ -48,8 +48,8 @@ app/
       security.py               # Argon2PasswordHasher, PyotpTotpService, SystemClock, SecretsTokenGenerator
       http.py                   # APIRouter /api/auth/*, identity_services placeholder, require_user
       cli.py                    # create_user_command (getpass, qrcode, prints)
-    public.py                   # what the rest of the app may use: router, require_user, AuthenticatedUser,
-                                #   identity_services, create_user_command
+    public.py                   # what the rest of the app may use: require_user, AuthenticatedUser
+                                #   (the router and the CLI command are mounted by app/bootstrap.py)
 ```
 
 `app/config.py`, `app/db.py` and `app/migrate.py` stay as shared platform modules that any infrastructure layer may
@@ -91,7 +91,9 @@ free of SQLAlchemy.
 and builds `require_user` and the router on top of it. `app/bootstrap.py` creates a `Container` (settings, session
 factory, adapters, the single `LoginThrottle` instance, clock) and `wire(app, container)` sets
 `app.dependency_overrides[identity_services]` to a per-request provider and includes the router once. `app/main.py`
-keeps the legacy routes, depends on `require_user` from `app.identity.public`, and calls `wire()`.
+keeps the legacy routes, depends on `require_user` from `app.identity.public`, and calls `wire()`. `app/cli.py`
+runs `migrate()` and then `bootstrap.create_user()`; migrating now happens before the password prompts instead of
+after them, which only means a rejected password leaves an already migrated schema (no observable effect).
 Tests call `wire()` with a fresh `Container` per test (fresh throttle, optional fake clock), replacing today's
 monkeypatching of `app.security`.
 *Alternative*: a module-level container imported by the HTTP adapter — rejected, it makes infrastructure depend on

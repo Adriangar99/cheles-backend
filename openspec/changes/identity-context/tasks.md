@@ -22,9 +22,9 @@ listed in design.md (throttle, `LogIn` order); moved code without new logic is c
 
 ## 4. Infrastructure and composition root
 
-- [ ] 4.1 Move `User`/`LoginSession` from `app/models.py` to `UserRow`/`LoginSessionRow` in `app/identity/infrastructure/orm.py` (same tables), add the repositories and `SqlUnitOfWork`, and import the module in `migrations/env.py`; verify `uv run alembic check` against a migrated scratch database reports no changes
-- [ ] 4.2 Add the security adapters (argon2, pyotp ±1 period, system clock, `secrets.token_urlsafe(32)`), the FastAPI router with the `identity_services` placeholder and `require_user`, the CLI `create_user_command`, and `public.py`; verify `uv run mypy` and `uv run lint-imports` pass
-- [ ] 4.3 Add `app/bootstrap.py` (`Container`, `wire(app, container)`), switch `app/main.py` to `wire()` + `require_user` and `app/cli.py` to the identity command, and delete `app/security.py` plus the legacy auth routes; adapt the characterization tests' imports and fixtures (fresh container per test, throttle clock via the container, user creation via `CreateUser`) without changing any assertion; verify the whole suite passes, `git diff tests/` shows no changed assertions, and ruff, mypy and lint-imports pass
+- [x] 4.1 Move `User`/`LoginSession` from `app/models.py` to `UserRow`/`LoginSessionRow` in `app/identity/infrastructure/orm.py` (same tables), add the repositories and `SqlUnitOfWork`, and import the module in `migrations/env.py`; verify `uv run alembic check` against a migrated scratch database reports no changes
+- [x] 4.2 Add the security adapters (argon2, pyotp ±1 period, system clock, `secrets.token_urlsafe(32)`), the FastAPI router with the `identity_services` placeholder and `require_user`, the CLI `create_user_command`, and `public.py`; verify `uv run mypy` and `uv run lint-imports` pass
+- [x] 4.3 Add `app/bootstrap.py` (`Container`, `wire(app, container)`), switch `app/main.py` to `wire()` + `require_user` and `app/cli.py` to the identity command, and delete `app/security.py` plus the legacy auth routes; adapt the characterization tests' imports and fixtures (fresh container per test, throttle clock via the container, user creation via `CreateUser`) without changing any assertion; verify the whole suite passes, `git diff tests/` shows no changed assertions, and ruff, mypy and lint-imports pass
 
 ## 5. Documentation and verification
 
