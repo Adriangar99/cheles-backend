@@ -1,7 +1,8 @@
 from datetime import date
 from decimal import Decimal
+from typing import Any, cast
 
-from sqlalchemy import func, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
 from app.models import Account, Category, Transaction
@@ -14,22 +15,29 @@ def month_bounds(month: str) -> tuple[date, date]:
     return start, end
 
 
-def _counted(stmt):
+def _counted[T: tuple[Any, ...]](stmt: Select[T]) -> Select[T]:
     """Solo movimientos que cuentan: no son transferencias propias y la cuenta no está excluida."""
     return stmt.join(Account, Account.id == Transaction.account_id).where(
         Transaction.kind == "normal", Account.role != "excluded"
     )
 
 
-def month_summary(db: Session, month: str) -> dict:
+def month_summary(db: Session, month: str) -> dict[str, Any]:
     start, end = month_bounds(month)
     in_month = (Transaction.booking_date >= start, Transaction.booking_date < end)
 
-    income = db.scalar(
-        _counted(select(func.coalesce(func.sum(Transaction.amount), 0))).where(*in_month, Transaction.amount > 0)
+    # coalesce(..., 0) never yields NULL
+    income = cast(
+        Decimal,
+        db.scalar(
+            _counted(select(func.coalesce(func.sum(Transaction.amount), 0))).where(*in_month, Transaction.amount > 0)
+        ),
     )
-    expenses = db.scalar(
-        _counted(select(func.coalesce(func.sum(Transaction.amount), 0))).where(*in_month, Transaction.amount < 0)
+    expenses = cast(
+        Decimal,
+        db.scalar(
+            _counted(select(func.coalesce(func.sum(Transaction.amount), 0))).where(*in_month, Transaction.amount < 0)
+        ),
     )
 
     # Ahorro del mes: lo que entra menos lo que sale de las cuentas de ahorro (transferencias propias)
@@ -69,7 +77,7 @@ def month_summary(db: Session, month: str) -> dict:
     }
 
 
-def monthly_history(db: Session, months: int = 12) -> list[dict]:
+def monthly_history(db: Session, months: int = 12) -> list[dict[str, Any]]:
     month = func.to_char(Transaction.booking_date, "YYYY-MM")
     rows = db.execute(
         _counted(

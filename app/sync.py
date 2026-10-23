@@ -1,7 +1,8 @@
 import hashlib
 import logging
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
+from typing import Any, cast
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
@@ -20,11 +21,11 @@ def normalize_iban(iban: str | None) -> str | None:
     return iban.replace(" ", "").upper() if iban else None
 
 
-def _iban_of(party_account: dict | None) -> str | None:
+def _iban_of(party_account: dict[str, Any] | None) -> str | None:
     return normalize_iban((party_account or {}).get("iban"))
 
 
-def _external_id(raw: dict, booking_date: date, amount: Decimal, description: str) -> str:
+def _external_id(raw: dict[str, Any], booking_date: date, amount: Decimal, description: str) -> str:
     if raw.get("entry_reference"):
         return f"ref:{raw['entry_reference']}"
     if raw.get("transaction_id"):
@@ -33,7 +34,7 @@ def _external_id(raw: dict, booking_date: date, amount: Decimal, description: st
     return f"h:{digest}"
 
 
-def normalize_transaction(raw: dict) -> dict:
+def normalize_transaction(raw: dict[str, Any]) -> dict[str, Any]:
     amount = Decimal(raw["transaction_amount"]["amount"])
     is_debit = raw.get("credit_debit_indicator") == "DBIT"
     if is_debit:
@@ -42,7 +43,9 @@ def normalize_transaction(raw: dict) -> dict:
     description = " ".join(raw.get("remittance_information") or []).strip()
     if not description:
         description = ((raw.get("bank_transaction_code") or {}).get("description") or "").strip()
-    booking_date = date.fromisoformat(raw.get("booking_date") or raw.get("value_date") or raw.get("transaction_date"))
+    booking_date = date.fromisoformat(
+        cast(str, raw.get("booking_date") or raw.get("value_date") or raw.get("transaction_date"))
+    )
     return {
         "external_id": _external_id(raw, booking_date, amount, description),
         "booking_date": booking_date,
@@ -67,7 +70,7 @@ def apply_derived_fields(tx: Transaction, ibans: set[str], categorizer: Categori
         tx.category_id = None if tx.kind == "transfer" else categorizer.categorize(tx)
 
 
-def _pick_balance(balances: list[dict]) -> Decimal | None:
+def _pick_balance(balances: list[dict[str, Any]]) -> Decimal | None:
     by_type = {b.get("balance_type"): b for b in balances}
     for balance_type in BALANCE_PREFERENCE:
         if balance_type in by_type:
@@ -76,6 +79,8 @@ def _pick_balance(balances: list[dict]) -> Decimal | None:
 
 
 def sync_account(db: Session, client: EnableBankingClient, account: Account) -> int:
+    uid = account.eb_uid
+    assert uid is not None, "sync_connection only syncs accounts linked to Enable Banking"
     last_date = db.scalar(
         select(func.max(Transaction.booking_date)).where(
             Transaction.account_id == account.id, Transaction.status == "BOOK"
@@ -86,7 +91,7 @@ def sync_account(db: Session, client: EnableBankingClient, account: Account) -> 
     else:
         date_from = date.today() - timedelta(days=get_settings().initial_history_days)
 
-    raws = client.get_transactions(account.eb_uid, date_from)
+    raws = client.get_transactions(uid, date_from)
 
     # Los pendientes cambian de id al confirmarse: los borramos y vuelven a llegar
     db.execute(delete(Transaction).where(Transaction.account_id == account.id, Transaction.status == "PDNG"))
@@ -110,15 +115,15 @@ def sync_account(db: Session, client: EnableBankingClient, account: Account) -> 
                 setattr(tx, key, value)
         apply_derived_fields(tx, ibans, categorizer)
 
-    account.balance = _pick_balance(client.get_balances(account.eb_uid))
-    account.balance_at = datetime.now(timezone.utc)
+    account.balance = _pick_balance(client.get_balances(uid))
+    account.balance_at = datetime.now(UTC)
     db.commit()
     return new_count
 
 
 def sync_connection(db: Session, connection: BankConnection, client: EnableBankingClient | None = None) -> int:
     client = client or EnableBankingClient()
-    if connection.valid_until < datetime.now(timezone.utc):
+    if connection.valid_until < datetime.now(UTC):
         connection.status = "expired"
         db.commit()
         return 0
@@ -134,7 +139,7 @@ def sync_connection(db: Session, connection: BankConnection, client: EnableBanki
         connection.last_error = str(e)[:1024]
         if e.status_code in (401, 403):
             connection.status = "expired"
-    connection.last_synced_at = datetime.now(timezone.utc)
+    connection.last_synced_at = datetime.now(UTC)
     db.commit()
     return total
 

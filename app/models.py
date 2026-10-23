@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import (
     JSON,
@@ -125,7 +126,7 @@ class Transaction(Base):
     category_manual: Mapped[bool] = mapped_column(Boolean, default=False)
     note: Mapped[str | None] = mapped_column(String(512))
     # Respuesta original del banco: permite reprocesar sin volver a pedir datos
-    raw: Mapped[dict] = mapped_column(JSON)
+    raw: Mapped[dict[str, Any]] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     account: Mapped[Account] = relationship()

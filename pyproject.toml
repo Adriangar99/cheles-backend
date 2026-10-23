@@ -26,6 +26,7 @@ dev = [
     "ruff>=0.8",
     "testcontainers[postgres]>=4.9",
     "time-machine>=2.16",
+    "types-qrcode>=8.0",
 ]
 
 [tool.uv]
@@ -37,3 +38,18 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI dependency markers are meant to be used as default arguments
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["app"]
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+# APScheduler 3.x ships no type information
+module = ["apscheduler.*"]
+ignore_missing_imports = true
