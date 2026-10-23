@@ -160,9 +160,10 @@ def test_only_a_transaction_id(ingest: Any) -> None:
 def test_no_bank_identifiers(ingest: Any) -> None:
     """Scenario: No bank identifiers"""
     long_text = "y" * 1500
-    same_payload = {"booking_date": "2026-10-03", "remittance": [long_text]}
-
-    rows = ingest(raw_tx("3.00", **same_payload), raw_tx("3.00", **same_payload))
+    rows = ingest(
+        raw_tx("3.00", booking_date="2026-10-03", remittance=[long_text]),
+        raw_tx("3.00", booking_date="2026-10-03", remittance=[long_text]),
+    )
 
     digest = hashlib.sha256(f"2026-10-03|-3.00|{long_text}".encode()).hexdigest()[:32]
     # Identical data gives the identical id, so the second payload updates the first instead of duplicating it
