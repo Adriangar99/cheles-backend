@@ -1,0 +1,126 @@
+"""Characterization of `transactions/reprocessing`."""
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
+
+from app.models import Account, Category, Transaction
+from tests.fakes import FakeAccount, FakeEnableBanking
+from tests.helpers import connect_bank, login, raw_tx
+
+SAVINGS_IBAN = "ES2222222222222222222222"
+
+
+@pytest.fixture
+def stored(client: TestClient, db: Session, fake_bank: FakeEnableBanking) -> None:
+    login(client, db)
+    fake_bank.transactions["main"] = [
+        raw_tx("40.00", reference="groceries", creditor="MERCADONA"),
+        raw_tx("300.00", reference="to-savings", creditor_iban=SAVINGS_IBAN),
+        raw_tx("15.00", reference="gas", creditor="GASOLINERA PEPE"),
+    ]
+    connect_bank(client, fake_bank, [FakeAccount(uid="main"), FakeAccount(uid="savings")])
+    fake_bank.calls.clear()
+
+
+def by_reference(db: Session, reference: str) -> Transaction:
+    db.expire_all()
+    return db.scalars(select(Transaction).where(Transaction.external_id == f"ref:{reference}")).one()
+
+
+def category_name(transaction: Transaction) -> str | None:
+    return transaction.category.name if transaction.category else None
+
+
+# ---------- Reprocessing from the original payload ----------
+
+
+@pytest.mark.usefixtures("stored")
+def test_full_reprocess(client: TestClient, fake_bank: FakeEnableBanking) -> None:
+    """Scenario: Full reprocess"""
+    response = client.post("/api/reprocess")
+
+    assert response.json() == {"processed": 3}
+    assert fake_bank.calls == []
+
+
+@pytest.mark.usefixtures("stored")
+def test_normalized_fields_are_recomputed_from_raw(client: TestClient, db: Session) -> None:
+    """Normalized fields come back from `raw` (part of «Reprocessing from the original payload»)."""
+    transaction = by_reference(db, "groceries")
+    transaction.description = "edited by hand in the database"
+    transaction.amount = 0  # type: ignore[assignment]
+    db.commit()
+
+    client.post("/api/reprocess")
+
+    transaction = by_reference(db, "groceries")
+    assert (transaction.description, float(transaction.amount)) == ("", -40.0)
+
+
+@pytest.mark.usefixtures("stored")
+def test_the_external_id_is_kept(client: TestClient, db: Session) -> None:
+    """Scenario: The external id is kept"""
+    transaction = by_reference(db, "groceries")
+    transaction.raw = {**transaction.raw, "entry_reference": "a-different-reference"}
+    flag_modified(transaction, "raw")
+    db.commit()
+
+    client.post("/api/reprocess")
+
+    db.expire_all()
+    assert db.get(Transaction, transaction.id).external_id == "ref:groceries"  # type: ignore[union-attr]
+
+
+@pytest.mark.usefixtures("stored")
+def test_new_own_account(client: TestClient, db: Session) -> None:
+    """Scenario: New own account"""
+    assert by_reference(db, "to-savings").kind == "normal"
+    savings = db.scalars(select(Account).where(Account.eb_uid == "savings")).one()
+    savings.iban = SAVINGS_IBAN
+    db.commit()
+
+    client.post("/api/reprocess")
+
+    assert by_reference(db, "to-savings").kind == "transfer"
+
+
+# ---------- Reprocessing respects manual edits ----------
+
+
+@pytest.mark.usefixtures("stored")
+def test_manual_category(client: TestClient, db: Session) -> None:
+    """Scenario: Manual category"""
+    leisure = db.scalars(select(Category.id).where(Category.name == "Ocio")).one()
+    client.patch(f"/api/transactions/{by_reference(db, 'groceries').id}", json={"category_id": leisure})
+
+    client.post("/api/reprocess")
+
+    assert category_name(by_reference(db, "groceries")) == "Ocio"
+
+
+@pytest.mark.usefixtures("stored")
+def test_note(client: TestClient, db: Session) -> None:
+    """Scenario: Note"""
+    client.patch(f"/api/transactions/{by_reference(db, 'groceries').id}", json={"note": "compra semanal"})
+
+    client.post("/api/reprocess")
+
+    assert by_reference(db, "groceries").note == "compra semanal"
+
+
+# ---------- Actions that trigger a reprocess ----------
+
+
+@pytest.mark.usefixtures("stored")
+def test_creating_a_rule(client: TestClient, db: Session) -> None:
+    """Scenario: Creating a rule"""
+    assert category_name(by_reference(db, "gas")) == "Otros gastos"
+    transport = db.scalars(select(Category.id).where(Category.name == "Transporte")).one()
+
+    response = client.post("/api/rules", json={"pattern": "gasolinera pepe", "category_id": transport})
+
+    assert response.json() == {"processed": 3}
+    assert category_name(by_reference(db, "gas")) == "Transporte"
