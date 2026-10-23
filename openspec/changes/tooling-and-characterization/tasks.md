@@ -45,13 +45,13 @@ misdescribes the code, so the spec is corrected (never the code) and the mismatc
 
 ## 7. Continuous integration
 
-- [ ] 7.1 Add `.github/workflows/ci.yml` (push to `main` and pull requests; pinned `setup-uv`; `uv sync --frozen`; ruff check, ruff format --check, mypy, pytest with coverage); verify the workflow passes on the pull request for this branch
+- [x] 7.1 Add `.github/workflows/ci.yml` (push to `main` and pull requests; pinned `setup-uv`; `uv sync --frozen`; ruff check, ruff format --check, mypy, pytest with coverage); verify the workflow passes on the pull request for this branch
 
 ## 8. Documentation and verification
 
-- [ ] 8.1 Update `README.md` with a Development section (uv setup, running tests, lint/type checks, creating and applying migrations, `DATABASE_URL` requirement); verify each documented command runs as written
-- [ ] 8.2 Before the first start of the new image against the real `cheles_db-data` volume, diff its `pg_dump --schema-only` against a freshly migrated database; verify they are identical (pause and report if not)
-- [ ] 8.3 Run `docker compose up -d --build`; verify the logs show the baseline being stamped, `alembic_version` holds `0001_baseline`, `/api/health` returns `{"ok":true}` and the web app still reaches the API through `http://127.0.0.1:3000/api/health`
+- [x] 8.1 Update `README.md` with a Development section (uv setup, running tests, lint/type checks, creating and applying migrations, `DATABASE_URL` requirement); verify each documented command runs as written
+- [x] 8.2 Before the first start of the new image against the real `cheles_db-data` volume, diff its `pg_dump --schema-only` against a freshly migrated database; verify they are identical (pause and report if not)
+- [x] 8.3 Run `docker compose up -d --build`; verify the logs show the baseline being stamped, `alembic_version` holds `0001_baseline`, `/api/health` returns `{"ok":true}` and the web app still reaches the API through `http://127.0.0.1:3000/api/health`
 
 ## Workflow follow-up
 
