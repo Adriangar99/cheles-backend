@@ -11,8 +11,8 @@ listed in design.md (throttle, `LogIn` order); moved code without new logic is c
 
 ## 2. Domain
 
-- [ ] 2.1 Write failing unit tests for `LoginThrottle` (blocks at 5 failures within 900 s, a failure older than the window stops counting, reset clears the key, keys are independent), then implement `app/identity/domain/throttle.py` with time passed in; verify the tests pass
-- [ ] 2.2 Add `User`, `LoginSession` (`is_active`), `SessionToken` (`hashed()`), `ensure_valid_password` and the domain errors; verify `uv run mypy` and `uv run lint-imports` pass
+- [x] 2.1 Write failing unit tests for `LoginThrottle` (blocks at 5 failures within 900 s, a failure older than the window stops counting, reset clears the key, keys are independent), then implement `app/identity/domain/throttle.py` with time passed in; verify the tests pass
+- [x] 2.2 Add `User`, `LoginSession` (`is_active`), `SessionToken` (`hashed()`), `ensure_valid_password` and the domain errors; verify `uv run mypy` and `uv run lint-imports` pass
 
 ## 3. Application
 
