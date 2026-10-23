@@ -10,7 +10,7 @@ for the event bus and the reconnection matching. Commit before any mutation chec
 
 ## 2. Banking application
 
-- [ ] 2.1 Add the ports and use cases (`ListConnections`, `ListAvailableBanks`, `StartAuthorization`, `CompleteAuthorization`, `SyncConnection`, `SyncAll`, `UpdateAccount` publishing `AccountIbanChanged` after commit, `OwnAccountIbans`, `AccountDisplayNames`); verify mypy and `lint-imports` pass
+- [x] 2.1 Add the ports and use cases (`ListConnections`, `ListAvailableBanks`, `StartAuthorization`, `CompleteAuthorization`, `SyncConnection`, `SyncAll`, `UpdateAccount` publishing `AccountIbanChanged` after commit, `OwnAccountIbans`, `AccountDisplayNames`); verify mypy and `lint-imports` pass
 
 ## 3. Infrastructure, composition and legacy removal
 
