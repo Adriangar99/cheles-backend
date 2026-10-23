@@ -16,9 +16,9 @@ listed in design.md (throttle, `LogIn` order); moved code without new logic is c
 
 ## 3. Application
 
-- [ ] 3.1 Define the ports in `app/identity/application/ports.py` (repositories, unit of work, password hasher, TOTP service, clock, token generator); verify `uv run mypy` passes
-- [ ] 3.2 Write failing unit tests for `LogIn` with in-memory adapters (throttle checked before credentials; wrong credentials record a failure and raise `InvalidCredentials`; success resets the throttle, purges expired sessions and stores the hashed token with expiry now + session_days), then implement `LogIn`; verify the tests pass
-- [ ] 3.3 Implement `LogOut`, `Authenticate` and `CreateUser` (deletes every session and user before adding the new one; enforces the password minimum); verify `uv run mypy` and `uv run lint-imports` pass
+- [x] 3.1 Define the ports in `app/identity/application/ports.py` (repositories, unit of work, password hasher, TOTP service, clock, token generator); verify `uv run mypy` passes
+- [x] 3.2 Write failing unit tests for `LogIn` with in-memory adapters (throttle checked before credentials; wrong credentials record a failure and raise `InvalidCredentials`; success resets the throttle, purges expired sessions and stores the hashed token with expiry now + session_days), then implement `LogIn`; verify the tests pass
+- [x] 3.3 Implement `LogOut`, `Authenticate` and `CreateUser` (deletes every session and user before adding the new one; enforces the password minimum); verify `uv run mypy` and `uv run lint-imports` pass
 
 ## 4. Infrastructure and composition root
 
