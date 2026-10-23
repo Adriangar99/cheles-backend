@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.shared.ids import AccountId, CategoryId, TransactionId
 from app.shared.money import Money
-from app.transactions.application.ports import SearchCriteria
+from app.transactions.application.ports import MovementRecord, SearchCriteria
 from app.transactions.domain.transaction import BOOKED, PENDING, Kind, Transaction
 from app.transactions.infrastructure.orm import TransactionRow
 
@@ -96,6 +96,29 @@ class SqlTransactionRepository:
                 TransactionRow.account_id == account_id, TransactionRow.status == BOOKED
             )
         )
+
+    def movement_records(self, start: date | None, end: date | None) -> list[MovementRecord]:
+        stmt = select(
+            TransactionRow.account_id,
+            TransactionRow.booking_date,
+            TransactionRow.amount,
+            TransactionRow.kind,
+            TransactionRow.category_id,
+        )
+        if start:
+            stmt = stmt.where(TransactionRow.booking_date >= start)
+        if end:
+            stmt = stmt.where(TransactionRow.booking_date < end)
+        return [
+            MovementRecord(
+                account_id=AccountId(account_id),
+                booking_date=booking_date,
+                amount=amount,
+                kind=cast(Kind, kind),
+                category_id=CategoryId(category_id) if category_id is not None else None,
+            )
+            for account_id, booking_date, amount, kind, category_id in self.db.execute(stmt)
+        ]
 
     def delete_pending(self, account_id: AccountId) -> None:
         self.db.execute(

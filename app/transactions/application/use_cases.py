@@ -7,6 +7,7 @@ from app.shared.ids import AccountId, CategoryId, TransactionId
 from app.transactions.application.ports import (
     CategoryCatalog,
     CategorySuggestions,
+    MovementRecord,
     OwnAccounts,
     SearchCriteria,
     UnitOfWork,
@@ -56,6 +57,15 @@ class Ingest:
                 self.uow.transactions.save(transaction)
             self.uow.commit()
         return created
+
+
+@dataclass
+class ListMovements:
+    uow: UnitOfWork
+
+    def __call__(self, start: date | None = None, end: date | None = None) -> list[MovementRecord]:
+        with self.uow:
+            return self.uow.transactions.movement_records(start, end)
 
 
 @dataclass
@@ -141,6 +151,7 @@ class TransactionsServices:
 
     ingest: Ingest
     latest_booked_date: LatestBookedDate
+    list_movements: ListMovements
     reprocess_all: ReprocessAll
     list_transactions: ListTransactions
     edit_transaction: EditTransaction

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from app.banking.application.ports import (
+    AccountSnapshot,
     BankingProvider,
     BankingSettings,
     Clock,
@@ -225,6 +226,19 @@ class OwnAccountIbans:
 
 
 @dataclass
+class AccountSnapshots:
+    uow: UnitOfWork
+
+    def __call__(self) -> list[AccountSnapshot]:
+        with self.uow:
+            return [
+                AccountSnapshot(a.id, a.role, a.balance.amount if a.balance else None)
+                for a in self.uow.accounts.all()
+                if a.id is not None
+            ]
+
+
+@dataclass
 class AccountDisplayNames:
     uow: UnitOfWork
 
@@ -246,3 +260,4 @@ class BankingServices:
     update_account: UpdateAccount
     own_account_ibans: OwnAccountIbans
     account_display_names: AccountDisplayNames
+    account_snapshots: AccountSnapshots

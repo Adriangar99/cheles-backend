@@ -3,6 +3,7 @@
 from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal
 from types import TracebackType
 from typing import Literal, Protocol, Self
 
@@ -22,6 +23,17 @@ class SearchCriteria:
     offset: int = 0
 
 
+@dataclass(frozen=True)
+class MovementRecord:
+    """Transactions' published read model: what other contexts may know about a movement."""
+
+    account_id: AccountId
+    booking_date: date
+    amount: Decimal  # signed: negative means money going out
+    kind: Literal["normal", "transfer"]
+    category_id: CategoryId | None
+
+
 class TransactionRepository(Protocol):
     def by_id(self, transaction_id: TransactionId) -> Transaction | None: ...
 
@@ -34,6 +46,10 @@ class TransactionRepository(Protocol):
         ...
 
     def latest_booked_date(self, account_id: AccountId) -> date | None: ...
+
+    def movement_records(self, start: date | None, end: date | None) -> list[MovementRecord]:
+        """Movements with `start <= booking_date < end` (either bound optional)."""
+        ...
 
     def delete_pending(self, account_id: AccountId) -> None: ...
 

@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.banking.application.ports import BankingProvider, BankingSettings
 from app.banking.application.use_cases import (
     AccountDisplayNames,
+    AccountSnapshots,
     BankingServices,
     CompleteAuthorization,
     ListAvailableBanks,
@@ -64,6 +65,7 @@ from app.transactions.application.use_cases import (
     EditTransaction,
     Ingest,
     LatestBookedDate,
+    ListMovements,
     ListTransactions,
     ReprocessAll,
     TransactionsServices,
@@ -135,6 +137,7 @@ class Container:
         return TransactionsServices(
             ingest=Ingest(uow=uow, own_accounts=own_accounts, suggestions=suggestions),
             latest_booked_date=LatestBookedDate(uow=uow),
+            list_movements=ListMovements(uow=uow),
             reprocess_all=reprocess_all,
             list_transactions=ListTransactions(uow=uow, own_accounts=own_accounts),
             edit_transaction=EditTransaction(
@@ -175,6 +178,7 @@ class Container:
             update_account=UpdateAccount(uow=uow, events=self.events),
             own_account_ibans=OwnAccountIbans(uow=uow),
             account_display_names=AccountDisplayNames(uow=uow),
+            account_snapshots=AccountSnapshots(uow=uow),
         )
 
 
