@@ -11,7 +11,7 @@ for `YearMonth`. Commit before any mutation check.
 ## 2. Transactions domain and application
 
 - [x] 2.1 Create `app/transactions/` and extend the import contracts to it (layers, framework-free core, no legacy incl. `app.legacy_bridge`, public-only between contexts); move the payload translation, `CounterpartyIban` and the derivation rules into the domain unchanged; verify mypy and `lint-imports` pass
-- [ ] 2.2 Add the ports and the use cases (`Ingest`, `LatestBookedDate`, `ListTransactions`, `EditTransaction`, `ReprocessAll`); verify mypy and `lint-imports` pass
+- [x] 2.2 Add the ports and the use cases (`Ingest`, `LatestBookedDate`, `ListTransactions`, `EditTransaction`, `ReprocessAll`); verify mypy and `lint-imports` pass
 
 ## 3. Infrastructure, composition and legacy switch-over
 
