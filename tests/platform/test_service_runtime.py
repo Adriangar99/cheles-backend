@@ -1,0 +1,11 @@
+"""Characterization of `platform/service-runtime`."""
+
+from fastapi.testclient import TestClient
+
+
+def test_health_check(client: TestClient) -> None:
+    """Scenario: Health check"""
+    response = client.get("/api/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
