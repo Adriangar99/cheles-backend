@@ -3,7 +3,9 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 
+from app.http_types import JsonDecimal
 from app.identity.public import AuthenticatedUser, require_user
 from app.shared.year_month import YearMonth
 from app.stats.application.use_cases import StatsServices
@@ -15,10 +17,34 @@ def stats_services() -> StatsServices:
     raise RuntimeError("Stats are not wired: call app.bootstrap.wire(app, container)")
 
 
+class CategorySpendingOut(BaseModel):
+    id: int | None  # null: spending without a category
+    name: str
+    icon: str
+    color: str
+    amount: JsonDecimal
+
+
+class SummaryOut(BaseModel):
+    month: str
+    income: JsonDecimal
+    expenses: JsonDecimal
+    net: JsonDecimal
+    saved: JsonDecimal
+    by_category: list[CategorySpendingOut]
+    balances: dict[str, JsonDecimal]  # by account role, plus "total"
+
+
+class MonthTotalsOut(BaseModel):
+    month: str
+    income: JsonDecimal
+    expenses: JsonDecimal
+
+
 router = APIRouter()
 
 
-@router.get("/api/stats/summary", response_model=None)
+@router.get("/api/stats/summary", response_model=SummaryOut)
 def summary(
     month: str | None = Query(None, pattern=r"^\d{4}-\d{2}$"),
     services: StatsServices = Depends(stats_services),
@@ -49,7 +75,7 @@ def summary(
     }
 
 
-@router.get("/api/stats/history", response_model=None)
+@router.get("/api/stats/history", response_model=list[MonthTotalsOut])
 def history(
     months: int = Query(12, le=60),
     services: StatsServices = Depends(stats_services),

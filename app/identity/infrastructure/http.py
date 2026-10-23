@@ -34,13 +34,21 @@ def require_user(request: Request, services: IdentityServices = Depends(identity
 router = APIRouter(prefix="/api/auth")
 
 
+class OkOut(BaseModel):
+    ok: bool
+
+
+class MeOut(BaseModel):
+    username: str
+
+
 class LoginBody(BaseModel):
     username: str
     password: str
     code: str
 
 
-@router.post("/login", response_model=None)
+@router.post("/login", response_model=OkOut)
 def login(
     body: LoginBody, request: Request, response: Response, services: IdentityServices = Depends(identity_services)
 ) -> dict[str, Any]:
@@ -64,7 +72,7 @@ def login(
     return {"ok": True}
 
 
-@router.post("/logout", response_model=None)
+@router.post("/logout", response_model=OkOut)
 def logout(
     request: Request, response: Response, services: IdentityServices = Depends(identity_services)
 ) -> dict[str, Any]:
@@ -73,6 +81,6 @@ def logout(
     return {"ok": True}
 
 
-@router.get("/me", response_model=None)
+@router.get("/me", response_model=MeOut)
 def me(user: User = Depends(require_user)) -> dict[str, Any]:
     return {"username": user.username}

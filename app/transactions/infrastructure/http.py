@@ -1,10 +1,12 @@
 """FastAPI adapter for transactions: listing, manual edits and reprocessing."""
 
+import datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from app.http_types import JsonDecimal
 from app.identity.public import AuthenticatedUser, require_user
 from app.shared.ids import AccountId, CategoryId, TransactionId
 from app.shared.year_month import YearMonth
@@ -37,10 +39,30 @@ def _serialize(view: TransactionView) -> dict[str, Any]:
     }
 
 
+class TransactionOut(BaseModel):
+    id: int
+    date: datetime.date
+    amount: JsonDecimal  # signed: negative means money going out
+    currency: str
+    status: str
+    counterparty: str | None
+    description: str
+    kind: Literal["normal", "transfer"]
+    category_id: int | None
+    category_manual: bool
+    account_id: int
+    account: str
+    note: str | None
+
+
+class ProcessedOut(BaseModel):
+    processed: int
+
+
 router = APIRouter()
 
 
-@router.get("/api/transactions", response_model=None)
+@router.get("/api/transactions", response_model=list[TransactionOut])
 def list_transactions(
     month: str | None = Query(None, pattern=r"^\d{4}-\d{2}$"),
     q: str | None = None,
@@ -71,7 +93,7 @@ class TxPatch(BaseModel):
     note: str | None = None
 
 
-@router.patch("/api/transactions/{tx_id}", response_model=None)
+@router.patch("/api/transactions/{tx_id}", response_model=TransactionOut)
 def patch_transaction(
     tx_id: int,
     body: TxPatch,
@@ -92,7 +114,7 @@ def patch_transaction(
         raise HTTPException(400, "Categoría inexistente") from None
 
 
-@router.post("/api/reprocess", response_model=None)
+@router.post("/api/reprocess", response_model=ProcessedOut)
 def reprocess(
     services: TransactionsServices = Depends(transactions_services), _: AuthenticatedUser = Depends(require_user)
 ) -> dict[str, Any]:
