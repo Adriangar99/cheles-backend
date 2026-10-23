@@ -69,6 +69,17 @@ CI (GitHub Actions) runs the same checks on every pull request and on `main`.
 Every scenario in `openspec/specs/` has a test whose docstring quotes it (`tests/<context>/test_<capability>.py`);
 `tests/test_spec_coverage.py` fails when one is missing.
 
+### API contract
+
+`openapi.json` (versioned) is the API contract: every JSON route declares a response model, and cheles-frontend
+generates its TypeScript types from a copy of this file. After changing a route, regenerate and commit it (any
+`DATABASE_URL` value works; no connection is made):
+
+    DATABASE_URL=postgresql+psycopg://unused@localhost/unused uv run python -m app.cli openapi
+
+`tests/platform/test_api_contract.py` fails while the file is out of date. Response models use the field types in
+`app/http_types.py` so amounts stay JSON numbers and datetimes keep their `+00:00` offset.
+
 ### Database and migrations
 
 `DATABASE_URL` is required (Docker Compose builds it from `DB_PASSWORD`). The schema is managed with Alembic: the

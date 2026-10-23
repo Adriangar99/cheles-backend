@@ -10,8 +10,8 @@ first, failing until the contract file exists.
 
 ## 2. Versioned contract
 
-- [ ] 2.1 Write the failing drift test (`tests/platform/test_api_contract.py`), then add `python -m app.cli openapi` and generate `openapi.json`; verify the test passes and fails again after a deliberate route change that is reverted
-- [ ] 2.2 Document regenerating the contract in the README and add the check to the Development section; verify the command runs as documented
+- [x] 2.1 Write the failing drift test (`tests/platform/test_api_contract.py`), then add `python -m app.cli openapi` and generate `openapi.json`; verify the test passes and fails again after a deliberate route change that is reverted
+- [x] 2.2 Document regenerating the contract in the README and add the check to the Development section; verify the command runs as documented
 
 ## 3. Verification
 
