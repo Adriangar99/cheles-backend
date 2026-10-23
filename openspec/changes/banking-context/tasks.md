@@ -20,7 +20,7 @@ for the event bus and the reconnection matching. Commit before any mutation chec
 
 ## 4. Documentation and verification
 
-- [ ] 4.1 Update the README architecture section (banking migrated, event bus and its wiring, remaining legacy modules, stats exception); verify the paths it names exist
+- [x] 4.1 Update the README architecture section (banking migrated, event bus and its wiring, remaining legacy modules, stats exception); verify the paths it names exist
 - [ ] 4.2 Run `docker compose up -d --build`; verify the API starts, `/api/banks` returns 401 without a session through the web app, and CI passes on the pull request
 
 ## Workflow follow-up
