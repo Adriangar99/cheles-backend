@@ -6,7 +6,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    database_url: str = "postgresql+psycopg://cheles:cheles@db:5432/cheles"
+    # Required: no built-in default, so a missing setting fails fast instead of using guessed credentials
+    database_url: str
 
     # URL pública de la web (a donde vuelve el navegador tras autorizar en el banco)
     public_url: str = "http://localhost:3000"
