@@ -18,6 +18,30 @@ compose file creates (alias `api`, port 8000). **Always start the backend first*
 Both repos share the Compose project name `cheles`, so `api`, `db` and `web` show up together. Never run
 `docker compose down --remove-orphans` from one repo: it would also remove the other repo's containers.
 
+## Development
+
+Requires [uv](https://docs.astral.sh/uv/) and Docker (the tests start a throwaway Postgres with testcontainers).
+
+    uv sync                              # Python 3.12 + runtime and dev dependencies from uv.lock
+    uv run pytest --cov                  # tests + coverage (fails below the ratchet in pyproject.toml)
+    uv run ruff check . && uv run ruff format --check .
+    uv run mypy                          # strict, over app/, migrations/ and tests/
+
+CI (GitHub Actions) runs the same checks on every pull request and on `main`.
+
+Every scenario in `openspec/specs/` has a test whose docstring quotes it (`tests/<context>/test_<capability>.py`);
+`tests/test_spec_coverage.py` fails when one is missing.
+
+### Database and migrations
+
+`DATABASE_URL` is required (Docker Compose builds it from `DB_PASSWORD`). The schema is managed with Alembic: the
+container runs `python -m app.cli migrate` before starting the API, which also adopts a database created before
+migrations existed.
+
+    export DATABASE_URL=postgresql+psycopg://cheles:<password>@localhost:5432/cheles   # a database at the latest revision
+    uv run alembic revision --autogenerate -m "describe the change"                     # review the generated file
+    uv run python -m app.cli migrate                                                    # apply it
+
 ## Enable Banking setup (once)
 
 1. Go to https://enablebanking.com/cp/applications and create an application.

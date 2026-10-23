@@ -1,6 +1,8 @@
-"""Crea (o reemplaza) el único usuario de la app y muestra el QR para el 2FA.
+"""Command-line entry points.
 
-Uso: docker compose run --rm api python -m app.cli create-user <usuario>
+- create-user: creates (or replaces) the app's single user and prints the 2FA QR code.
+  docker compose run --rm api python -m app.cli create-user <username>
+- migrate: brings the database schema to the latest migration (run on every container start).
 """
 
 import getpass
@@ -11,7 +13,8 @@ import pyotp
 import qrcode
 from sqlalchemy import delete
 
-from app.db import Base, SessionLocal, engine
+from app.db import SessionLocal
+from app.migrate import migrate
 from app.models import LoginSession, User
 from app.security import hash_password
 
@@ -26,7 +29,7 @@ def create_user(username: str) -> None:
     secret = pyotp.random_base32()
     uri = pyotp.TOTP(secret).provisioning_uri(name=username, issuer_name="Cheles")
 
-    Base.metadata.create_all(engine)
+    migrate()
     with SessionLocal() as db:
         db.execute(delete(LoginSession))
         db.execute(delete(User))
@@ -42,7 +45,12 @@ def create_user(username: str) -> None:
     print(f"Clave manual: {secret}")
 
 
+USAGE = "Uso: python -m app.cli create-user <usuario> | python -m app.cli migrate"
+
 if __name__ == "__main__":
-    if len(sys.argv) != 3 or sys.argv[1] != "create-user":
-        sys.exit("Uso: python -m app.cli create-user <usuario>")
-    create_user(sys.argv[2])
+    if len(sys.argv) == 2 and sys.argv[1] == "migrate":
+        migrate()
+    elif len(sys.argv) == 3 and sys.argv[1] == "create-user":
+        create_user(sys.argv[2])
+    else:
+        sys.exit(USAGE)

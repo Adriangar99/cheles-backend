@@ -55,8 +55,11 @@ class EnableBankingClient:
             raise EnableBankingError(response.status_code, body)
         return response.json()
 
-    def list_aspsps(self, country: str) -> list[dict]:
-        return self._request("GET", "/aspsps", params={"country": country, "psu_type": "personal"})["aspsps"]
+    def list_aspsps(self, country: str) -> list[dict[str, Any]]:
+        aspsps: list[dict[str, Any]] = self._request(
+            "GET", "/aspsps", params={"country": country, "psu_type": "personal"}
+        )["aspsps"]
+        return aspsps
 
     def start_auth(self, aspsp_name: str, country: str, state: str, redirect_url: str, valid_until: datetime) -> str:
         data = self._request(
@@ -71,20 +74,23 @@ class EnableBankingClient:
                 "language": "es",
             },
         )
-        return data["url"]
+        url: str = data["url"]
+        return url
 
-    def create_session(self, code: str) -> dict:
-        return self._request("POST", "/sessions", json={"code": code})
+    def create_session(self, code: str) -> dict[str, Any]:
+        session: dict[str, Any] = self._request("POST", "/sessions", json={"code": code})
+        return session
 
     def delete_session(self, session_id: str) -> None:
         self._request("DELETE", f"/sessions/{session_id}")
 
-    def get_balances(self, account_uid: str) -> list[dict]:
-        return self._request("GET", f"/accounts/{account_uid}/balances")["balances"]
+    def get_balances(self, account_uid: str) -> list[dict[str, Any]]:
+        balances: list[dict[str, Any]] = self._request("GET", f"/accounts/{account_uid}/balances")["balances"]
+        return balances
 
-    def get_transactions(self, account_uid: str, date_from: date) -> list[dict]:
+    def get_transactions(self, account_uid: str, date_from: date) -> list[dict[str, Any]]:
         params: dict[str, str] = {"date_from": date_from.isoformat()}
-        transactions: list[dict] = []
+        transactions: list[dict[str, Any]] = []
         while True:
             data = self._request("GET", f"/accounts/{account_uid}/transactions", params=params)
             transactions.extend(data.get("transactions", []))

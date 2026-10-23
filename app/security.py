@@ -2,7 +2,7 @@ import hashlib
 import secrets
 import time
 from collections import defaultdict, deque
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pyotp
 from argon2 import PasswordHasher
@@ -40,8 +40,8 @@ def _hash_token(token: str) -> str:
 
 def create_login_session(db: Session, user: User) -> tuple[str, datetime]:
     token = secrets.token_urlsafe(32)
-    expires_at = datetime.now(timezone.utc) + timedelta(days=get_settings().session_days)
-    db.execute(delete(LoginSession).where(LoginSession.expires_at < datetime.now(timezone.utc)))
+    expires_at = datetime.now(UTC) + timedelta(days=get_settings().session_days)
+    db.execute(delete(LoginSession).where(LoginSession.expires_at < datetime.now(UTC)))
     db.add(LoginSession(token_hash=_hash_token(token), user_id=user.id, expires_at=expires_at))
     db.commit()
     return token, expires_at
@@ -58,7 +58,7 @@ def current_user(request: Request, db: Session = Depends(get_db)) -> User:
         session = db.scalar(
             select(LoginSession).where(
                 LoginSession.token_hash == _hash_token(token),
-                LoginSession.expires_at > datetime.now(timezone.utc),
+                LoginSession.expires_at > datetime.now(UTC),
             )
         )
         if session:

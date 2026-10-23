@@ -1,0 +1,219 @@
+"""Characterization of `banking/bank-connection`."""
+
+from datetime import UTC, datetime, timedelta
+from urllib.parse import parse_qs, urlparse
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.models import Account, BankConnection, PendingAuth, Transaction
+from tests.fakes import FakeAccount, FakeEnableBanking
+from tests.helpers import connect_bank, login, raw_tx
+
+
+@pytest.fixture
+def user(client: TestClient, db: Session) -> None:
+    login(client, db)
+
+
+def start_authorization(client: TestClient, bank: str = "BBVA") -> str:
+    response = client.post("/api/banks/connect", json={"name": bank})
+    assert response.status_code == 200, response.text
+    state: str = parse_qs(urlparse(response.json()["url"]).query)["state"][0]
+    return state
+
+
+# ---------- List of available banks ----------
+
+
+@pytest.mark.usefixtures("user")
+def test_available_banks(client: TestClient, fake_bank: FakeEnableBanking) -> None:
+    """Scenario: Available banks"""
+    response = client.get("/api/banks/available")
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {"name": "BBVA", "country": "ES", "logo": "https://logos.example/bbva.png"},
+        {"name": "Revolut", "country": "ES", "logo": "https://logos.example/revolut.png"},
+    ]
+    assert fake_bank.calls_to("list_aspsps") == [("ES",)]
+
+
+@pytest.mark.usefixtures("user")
+def test_enable_banking_error(client: TestClient, fake_bank: FakeEnableBanking) -> None:
+    """Scenario: Enable Banking error"""
+    fake_bank.fail("list_aspsps", 503, {"error": "down"})
+
+    response = client.get("/api/banks/available")
+
+    assert response.status_code == 502
+    assert response.json() == {"detail": "Enable Banking: {'error': 'down'}"}
+
+
+# ---------- Starting authorization with a bank ----------
+
+
+@pytest.mark.usefixtures("user")
+def test_authorization_started(client: TestClient, db: Session, fake_bank: FakeEnableBanking) -> None:
+    """Scenario: Authorization started"""
+    before = datetime.now(UTC)
+
+    response = client.post("/api/banks/connect", json={"name": "BBVA"})
+
+    pending = db.scalars(select(PendingAuth)).one()
+    assert (pending.aspsp_name, pending.aspsp_country) == ("BBVA", "ES")
+    assert len(pending.state) >= 32
+    assert response.json() == {"url": f"https://bank.example/BBVA/authorize?state={pending.state}"}
+    [(bank, country, state, redirect_url, valid_until)] = fake_bank.calls_to("start_auth")
+    assert (bank, country, state) == ("BBVA", "ES", pending.state)
+    assert redirect_url == "http://localhost:3000/api/banks/callback"
+    assert before + timedelta(days=180) <= valid_until <= datetime.now(UTC) + timedelta(days=180)
+
+
+@pytest.mark.usefixtures("user")
+def test_error_while_starting(client: TestClient, fake_bank: FakeEnableBanking) -> None:
+    """Scenario: Error while starting"""
+    fake_bank.fail("start_auth", 400, "invalid aspsp")
+
+    response = client.post("/api/banks/connect", json={"name": "BBVA"})
+
+    assert response.status_code == 502
+    assert response.json() == {"detail": "Enable Banking: invalid aspsp"}
+
+
+# ---------- Authorization callback ----------
+
+
+@pytest.mark.usefixtures("user")
+def test_authorization_completed(client: TestClient, db: Session, fake_bank: FakeEnableBanking) -> None:
+    """Scenario: Authorization completed"""
+    state = start_authorization(client)
+    fake_bank.add_session(
+        "code-1", [FakeAccount(uid="uid-1"), FakeAccount(uid="uid-2")], valid_until="2027-04-01T00:00:00+00:00"
+    )
+
+    response = client.get("/api/banks/callback", params={"code": "code-1", "state": state})
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/bancos?connected=1"
+    connection = db.scalars(select(BankConnection)).one()
+    assert (connection.status, connection.session_id) == ("active", "session-code-1")
+    assert connection.valid_until == datetime(2027, 4, 1, tzinfo=UTC)
+    accounts = db.scalars(select(Account).order_by(Account.id)).all()
+    assert [(a.eb_uid, a.connection_id) for a in accounts] == [("uid-1", connection.id), ("uid-2", connection.id)]
+    assert db.scalars(select(PendingAuth)).all() == []
+
+
+@pytest.mark.usefixtures("user")
+@pytest.mark.parametrize("problem", ["bank error", "no code", "unknown state"])
+def test_the_bank_returns_an_error_or_data_is_missing(
+    client: TestClient, db: Session, fake_bank: FakeEnableBanking, problem: str
+) -> None:
+    """Scenario: The bank returns an error or data is missing"""
+    state = start_authorization(client)
+    fake_bank.add_session("code-1", [FakeAccount(uid="uid-1")])
+    params = {
+        "bank error": {"code": "code-1", "state": state, "error": "access_denied"},
+        "no code": {"state": state},
+        "unknown state": {"code": "code-1", "state": "not-a-pending-state"},
+    }[problem]
+
+    response = client.get("/api/banks/callback", params=params)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/bancos?error=1"
+    assert db.scalars(select(BankConnection)).all() == []
+
+
+@pytest.mark.usefixtures("user")
+def test_session_creation_fails(client: TestClient, db: Session) -> None:
+    """Scenario: Session creation fails"""
+    state = start_authorization(client)
+
+    response = client.get("/api/banks/callback", params={"code": "unknown-code", "state": state})
+
+    assert response.headers["location"] == "/bancos?error=1"
+    assert db.scalars(select(BankConnection)).all() == []
+
+
+@pytest.mark.usefixtures("user")
+def test_the_first_sync_fails(
+    client: TestClient, db: Session, fake_bank: FakeEnableBanking, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Scenario: The first sync fails"""
+    fake_bank.fail("get_transactions", error=RuntimeError("unexpected"))
+
+    connect_bank(client, fake_bank, [FakeAccount(uid="uid-1")])
+
+    assert "Falló la primera sincronización" in caplog.text
+    assert db.scalars(select(BankConnection)).one().status == "active"
+
+
+# ---------- Re-linking known accounts on reconnection ----------
+
+
+@pytest.mark.usefixtures("user")
+def test_reconnected_account_matched_by_hash(client: TestClient, db: Session, fake_bank: FakeEnableBanking) -> None:
+    """Scenario: Reconnected account matched by hash"""
+    fake_bank.transactions["uid-old"] = [raw_tx("10.00", reference="r1")]
+    connect_bank(client, fake_bank, [FakeAccount(uid="uid-old", identification_hash="hash-1")], code="first")
+    account = db.scalars(select(Account)).one()
+    client.patch(f"/api/accounts/{account.id}", json={"role": "savings", "alias": "Hucha"})
+
+    second = connect_bank(client, fake_bank, [FakeAccount(uid="uid-new", identification_hash="hash-1")], code="second")
+
+    db.expire_all()
+    [reused] = db.scalars(select(Account)).all()
+    assert reused.id == account.id
+    assert (reused.connection_id, reused.eb_uid) == (second, "uid-new")
+    assert (reused.role, reused.alias) == ("savings", "Hucha")
+    assert len(db.scalars(select(Transaction).where(Transaction.account_id == account.id)).all()) == 1
+
+
+@pytest.mark.usefixtures("user")
+def test_reconnected_account_matched_by_iban(client: TestClient, db: Session, fake_bank: FakeEnableBanking) -> None:
+    """Scenario: Reconnected account matched by IBAN"""
+    connect_bank(
+        client, fake_bank, [FakeAccount(uid="u1", identification_hash="hash-1", iban="ES12 3456")], code="first"
+    )
+
+    connect_bank(
+        client, fake_bank, [FakeAccount(uid="u2", identification_hash="hash-2", iban="es123456")], code="second"
+    )
+
+    db.expire_all()
+    [account] = db.scalars(select(Account)).all()
+    assert (account.eb_uid, account.identification_hash, account.iban) == ("u2", "hash-2", "ES123456")
+
+
+@pytest.mark.usefixtures("user")
+def test_new_account(client: TestClient, db: Session, fake_bank: FakeEnableBanking) -> None:
+    """Scenario: New account"""
+    connect_bank(
+        client,
+        fake_bank,
+        [
+            FakeAccount(uid="u1", name="Cuenta Online", currency="USD"),
+            FakeAccount(uid="u2", name=None, currency=None),
+        ],
+        bank="BBVA",
+    )
+
+    accounts = db.scalars(select(Account).order_by(Account.id)).all()
+    assert [(a.name, a.role, a.currency) for a in accounts] == [
+        ("Cuenta Online", "main", "USD"),
+        ("BBVA", "main", "EUR"),
+    ]
+
+
+@pytest.mark.usefixtures("user")
+def test_the_bank_sends_no_iban(client: TestClient, db: Session, fake_bank: FakeEnableBanking) -> None:
+    """Scenario: The bank sends no IBAN"""
+    connect_bank(client, fake_bank, [FakeAccount(uid="u1", identification_hash="hash-1", iban="ES123456")], code="a")
+
+    connect_bank(client, fake_bank, [FakeAccount(uid="u2", identification_hash="hash-1", iban=None)], code="b")
+
+    db.expire_all()
+    assert db.scalars(select(Account)).one().iban == "ES123456"
