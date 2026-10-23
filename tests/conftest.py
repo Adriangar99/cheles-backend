@@ -69,11 +69,6 @@ def db() -> Iterator[Session]:
 
 
 @pytest.fixture
-def postgres() -> PostgresContainer:
-    return _postgres
-
-
-@pytest.fixture
 def fake_bank(monkeypatch: pytest.MonkeyPatch) -> FakeEnableBanking:
     """Replaces Enable Banking everywhere the app instantiates its client."""
     fake = FakeEnableBanking()

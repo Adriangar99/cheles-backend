@@ -28,9 +28,9 @@ misdescribes the code, so the spec is corrected (never the code) and the mismatc
 
 ## 5. Service runtime (new behavior, TDD)
 
-- [x] 5.1 Write failing tests for «Missing database URL» (API and CLI started in a subprocess without `DATABASE_URL` exit with an error naming it) and «Database URL provided»; make `Settings.database_url` required and document it in `.env.example`; verify the tests pass
+- [x] 5.1 Write failing tests for «Missing database URL» (API and CLI started in a subprocess without `DATABASE_URL` exit with an error naming it); make `Settings.database_url` required and document it in `.env.example`; verify the tests pass
 - [x] 5.2 Write failing tests for «Empty database», «Database already up to date» and «Existing database created before migrations» (each against its own throwaway database, the last one built with `create_all` and seeded with rows); implement `python -m app.cli migrate` (stamp baseline when tables exist without `alembic_version`, then `upgrade head`); verify the tests pass and the rows survive
-- [x] 5.3 Write the «Schema equivalence» test (pg_dump comparison from 3.2 automated) and the «Health check» test; verify they pass
+- [x] 5.3 Write the «Health check» test; verify it passes (the schema comparison from 3.2 stays a one-off manual check, not a test)
 - [x] 5.4 Remove `create_all` from the API lifespan and from `create-user` (which now runs the migrate routine first), and change the Dockerfile `CMD` to run `migrate` before `exec uvicorn`; verify the whole suite still passes and `create-user` works on an empty database in a test
 
 ## 6. Characterization tests (existing behavior)

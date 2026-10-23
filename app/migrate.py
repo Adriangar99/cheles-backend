@@ -25,7 +25,7 @@ def migrate() -> None:
         config.attributes["connection"] = connection
         tables = set(inspect(connection).get_table_names())
         if "alembic_version" not in tables and "users" in tables:
-            # Tables match the baseline exactly (see the schema-equivalence test): record it, change nothing
+            # The old startup built exactly the baseline schema: record it, change nothing
             print(f"Existing database without schema version: stamping it as {BASELINE}")
             command.stamp(config, BASELINE)
         command.upgrade(config, "head")

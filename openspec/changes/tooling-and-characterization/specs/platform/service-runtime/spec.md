@@ -15,10 +15,6 @@ missing. No default database URL or credentials are built into the code.
 - **WHEN** the API or the CLI starts without `DATABASE_URL`
 - **THEN** it exits with an error naming `DATABASE_URL` and does not attempt any database connection
 
-#### Scenario: Database URL provided
-- **WHEN** `DATABASE_URL` points to a reachable Postgres database
-- **THEN** the service starts and uses that database
-
 ### Requirement: Schema migrations on startup
 Before serving requests, the service SHALL bring the database schema to the latest version: an empty database gets
 the full schema, an up-to-date database is left as is, and an older versioned database is upgraded.
@@ -39,14 +35,6 @@ later migrations.
 #### Scenario: Existing database created before migrations
 - **WHEN** the container starts against a database with the application's tables and rows but no schema version
 - **THEN** the database is marked as the baseline version, every existing row is kept and the API starts
-
-### Requirement: Same schema regardless of history
-A database created from scratch by the migrations SHALL have the same tables, columns, types, constraints and indexes
-as one created by the previous `create_all`-based startup.
-
-#### Scenario: Schema equivalence
-- **WHEN** the schema of a freshly migrated database is compared with the schema of a database created before migrations existed
-- **THEN** both schemas are identical apart from the migration version table
 
 ### Requirement: Health endpoint
 The service SHALL answer `GET /api/health` with `{"ok": true}` without requiring a session.

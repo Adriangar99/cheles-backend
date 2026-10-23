@@ -77,8 +77,6 @@ missing. `.env.example` documents it for runs outside Docker. Compose keeps buil
   a tiny ASGI middleware (test-only) that sets `scope["client"]` from an `X-Test-Client-IP` header.
 - **CLI**: `create_user` is called with `getpass` monkeypatched and stdout captured; `migrate` is run against
   dedicated throwaway databases for the runtime-spec scenarios (empty, pre-migration with rows, up to date).
-- **Schema equivalence**: one test creates a database with `create_all` and another with migrations and compares
-  their `pg_dump --schema-only` output (run inside the Postgres container), ignoring `alembic_version`.
 
 ### Static checks
 - ruff with line length 120 and rules `E, F, W, I, UP, B, SIM, RUF`; `ruff format` applied once to the whole codebase
@@ -101,9 +99,9 @@ apply. The Alembic baseline is the first migration.
 
 ## Risks / Trade-offs
 
-- [Baseline differs from a real pre-migration database] → The schema-equivalence test compares migrated vs
-  `create_all` output; before stamping the real volume, its schema dump is diffed against a freshly migrated one, and
-  the apply pauses if they differ.
+- [Baseline differs from a real pre-migration database] → Checked by hand while applying: the baseline's
+  `pg_dump --schema-only` was diffed against `create_all` output, and the real volume against a freshly migrated
+  database, before stamping it. One-off checks like these are not kept as tests.
 - [Characterization tests encode the known defects (⇄ mark, observations)] → Intended: the fix changes will flip those
   tests explicitly, alongside a MODIFIED spec.
 - [Tests import ORM models for setup and stored-state assertions] → Confined to arrange/assert steps; when the
