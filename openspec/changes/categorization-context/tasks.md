@@ -7,7 +7,7 @@ rewritten; moved code is covered by the characterization tests. Commit before an
 ## 1. Domain and application
 
 - [x] 1.1 Create `app/categorization/{domain,application,infrastructure}` and `public.py`, and generalize the import-linter contracts to both contexts plus the cross-context «public only» contract; verify `uv run lint-imports` passes
-- [ ] 1.2 Write failing unit tests for `CategorizationPolicy` (first matching rule by ascending priority then creation order, case-insensitive match on « counterparty description », trailing-space patterns, fallbacks: Bizum income, other income, other expense for debits and zero), then implement it with `Category`, `Rule`, the default catalog and `UnknownCategory`; verify the tests pass
+- [x] 1.2 Write failing unit tests for `CategorizationPolicy` (first matching rule by ascending priority then creation order, case-insensitive match on « counterparty description », trailing-space patterns, fallbacks: Bizum income, other income, other expense for debits and zero), then implement it with `Category`, `Rule`, the default catalog and `UnknownCategory`; verify the tests pass
 - [ ] 1.3 Add the ports and use cases (`SeedDefaultCatalog`, `ListCategories`, `CreateRule`, `CategoryExists`, `LoadPolicy`, `CategoryLabels`, `CategorizationServices`); verify `uv run mypy` and `uv run lint-imports` pass
 
 ## 2. Infrastructure and legacy switch-over
