@@ -8,7 +8,8 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.categorization.infrastructure.orm import CategoryRow as Category
 from app.db import SessionLocal
-from app.models import Account, Transaction
+from app.models import Account
+from app.transactions.infrastructure.orm import TransactionRow as Transaction
 from tests.fakes import FakeAccount, FakeEnableBanking
 from tests.helpers import connect_bank, login, raw_tx
 

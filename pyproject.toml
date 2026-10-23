@@ -97,7 +97,7 @@ forbidden_modules = ["fastapi", "starlette", "pydantic", "sqlalchemy", "httpx", 
 name = "Contexts do not depend on legacy modules"
 type = "forbidden"
 source_modules = ["app.identity", "app.categorization", "app.transactions"]
-forbidden_modules = ["app.main", "app.cli", "app.models", "app.sync", "app.stats", "app.enablebanking"]
+forbidden_modules = ["app.main", "app.cli", "app.models", "app.sync", "app.stats", "app.enablebanking", "app.legacy_bridge"]
 
 [[tool.importlinter.contracts]]
 # app.bootstrap is the composition root and may wire context internals
@@ -116,6 +116,8 @@ forbidden_modules = [
     "app.transactions.infrastructure",
 ]
 allow_indirect_imports = true
+# Transitional, read-only: stats aggregates the transactions table until stats becomes its own read model
+ignore_imports = ["app.stats -> app.transactions.infrastructure.orm"]
 
 [[tool.importlinter.contracts]]
 name = "Identity uses other contexts only through their public API"

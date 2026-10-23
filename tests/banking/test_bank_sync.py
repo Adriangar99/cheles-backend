@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 import app.main
 from app.categorization.infrastructure.orm import CategoryRow
 from app.enablebanking import EnableBankingClient
-from app.models import Account, BankConnection, Transaction
+from app.models import Account, BankConnection
+from app.transactions.infrastructure.orm import TransactionRow as Transaction
 from tests.fakes import FakeAccount, FakeEnableBanking
 from tests.helpers import balance, connect_bank, login, raw_tx
 
@@ -83,7 +84,7 @@ def test_scheduled_run(
 def test_scheduled_sync_failures_are_logged(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
     """A failure in the scheduled sync is logged and does not propagate (part of «Scheduled sync»)."""
 
-    def broken(db: Session) -> int:
+    def broken(db: Session, transactions: object) -> int:
         raise RuntimeError("database down")
 
     monkeypatch.setattr(app.main, "sync_all", broken)

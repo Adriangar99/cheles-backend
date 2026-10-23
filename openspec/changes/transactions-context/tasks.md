@@ -15,9 +15,9 @@ for `YearMonth`. Commit before any mutation check.
 
 ## 3. Infrastructure, composition and legacy switch-over
 
-- [ ] 3.1 Move `Transaction` to `TransactionRow` in `app/transactions/infrastructure/orm.py` (no `account` relationship), add the repository and unit of work, register the module in `migrations/env.py`; verify `alembic check` on a migrated scratch database reports no changes
-- [ ] 3.2 Add the transactions router (list, patch, reprocess), `app/legacy_bridge.py` (`OwnAccounts`), the categorization port adapters and the `Container`/`wire()` wiring; switch `app/sync.py` to banking-only (window, fetch transactions and balances, ingest, balance), the account IBAN change and `POST /api/rules` to `app.transactions.public`, and add the commented stats exception; remove the moved code from `app/sync.py` and `app/main.py`
-- [ ] 3.3 Adapt the characterization tests' imports/fixtures without changing expected values; verify the whole suite, ruff, mypy and `lint-imports` pass, `git diff tests/` shows no changed expected values, and `bootstrap.current()` is no longer used by `app/sync.py`
+- [x] 3.1 Move `Transaction` to `TransactionRow` in `app/transactions/infrastructure/orm.py` (no `account` relationship), add the repository and unit of work, register the module in `migrations/env.py`; verify `alembic check` on a migrated scratch database reports no changes
+- [x] 3.2 Add the transactions router (list, patch, reprocess), `app/legacy_bridge.py` (`OwnAccounts`), the categorization port adapters and the `Container`/`wire()` wiring; switch `app/sync.py` to banking-only (window, fetch transactions and balances, ingest, balance), the account IBAN change and `POST /api/rules` to `app.transactions.public`, and add the commented stats exception; remove the moved code from `app/sync.py` and `app/main.py`
+- [x] 3.3 Adapt the characterization tests' imports/fixtures without changing expected values; verify the whole suite, ruff, mypy and `lint-imports` pass, `git diff tests/` shows no changed expected values, and `bootstrap.current()` is no longer used by `app/sync.py`
 
 ## 4. Documentation and verification
 
