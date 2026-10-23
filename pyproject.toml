@@ -66,7 +66,7 @@ branch = true
 
 [tool.coverage.report]
 # Ratchet: the measured coverage rounded down; raise it as coverage grows, never lower it
-fail_under = 94
+fail_under = 97
 show_missing = true
 skip_covered = true
 
@@ -127,7 +127,6 @@ source_modules = [
 forbidden_modules = [
     "app.main",
     "app.cli",
-    "app.legacy_stats",
 ]
 
 [[tool.importlinter.contracts]]
@@ -137,7 +136,6 @@ type = "forbidden"
 source_modules = [
     "app.main",
     "app.cli",
-    "app.legacy_stats",
 ]
 forbidden_modules = [
     "app.identity.domain",
@@ -157,8 +155,6 @@ forbidden_modules = [
     "app.stats.infrastructure",
 ]
 allow_indirect_imports = true
-# Transitional, read-only: removed together with app/legacy_stats.py in this change
-ignore_imports = ["app.legacy_stats -> app.banking.infrastructure.orm", "app.legacy_stats -> app.transactions.infrastructure.orm"]
 
 [[tool.importlinter.contracts]]
 name = "Identity uses other contexts only through their public API"
@@ -273,7 +269,6 @@ forbidden_modules = [
     "app.bootstrap",
     "app.main",
     "app.cli",
-    "app.legacy_stats",
     "fastapi",
     "starlette",
     "pydantic",

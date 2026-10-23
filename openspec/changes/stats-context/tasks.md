@@ -14,8 +14,8 @@ written first for the stats aggregation rules, which are rewritten from SQL to P
 
 ## 3. Infrastructure, composition and cleanup
 
-- [ ] 3.1 Add the stats router, the port adapters and wiring in `app/bootstrap.py`, store the container in `app.state` in `wire()`, switch `app/main.py` (lifespan, scheduled sync, rules route) to it, and delete `app/stats.py`, `bootstrap.current()` and the import-linter exception
-- [ ] 3.2 Adapt the tests (scheduled sync with the test container) without changing expected values; verify the whole suite, ruff, mypy and `lint-imports` pass, `git diff tests/` shows no changed expected values, and no `current()` or `ignore_imports` remain
+- [x] 3.1 Add the stats router, the port adapters and wiring in `app/bootstrap.py`, store the container in `app.state` in `wire()`, switch `app/main.py` (lifespan, scheduled sync, rules route) to it, and delete `app/stats.py`, `bootstrap.current()` and the import-linter exception
+- [x] 3.2 Adapt the tests (scheduled sync with the test container) without changing expected values; verify the whole suite, ruff, mypy and `lint-imports` pass, `git diff tests/` shows no changed expected values, and no `current()` or `ignore_imports` remain
 
 ## 4. Documentation and verification
 
