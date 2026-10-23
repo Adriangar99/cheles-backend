@@ -20,20 +20,25 @@ context: |
   - Transfers between the user's own accounts (detected by IBAN) count as neither expense nor
     income. Account roles: main (day to day), savings, excluded.
 
-  Architecture (DDD + hexagonal, incremental migration in progress):
-  - Bounded contexts: identity, banking, transactions, categorization, stats. Each one has
-    domain/ (pure: no FastAPI, SQLAlchemy or httpx), application/ (use cases and ports) and
-    infrastructure/ (adapters: FastAPI HTTP, SQLAlchemy repos, Enable Banking, scheduler).
-  - Minimal shared kernel: IDs, Money (no sign semantics), YearMonth and integration events.
+  Architecture (DDD + hexagonal; every context migrated):
+  - Bounded contexts under app/: identity, categorization, transactions, banking, stats. Each one has
+    domain/ (pure: no FastAPI, SQLAlchemy, httpx…), application/ (use cases and ports),
+    infrastructure/ (ORM rows + repositories, HTTP router, external adapters) and public.py
+    (the only module other code may import).
+  - Shared kernel app/shared/: Money (no sign semantics), YearMonth, typed ids, in-memory event bus.
     A value object only goes into the kernel if it means the same in every context; otherwise
     each context owns its own (e.g. Iban in banking vs CounterpartyIban in transactions).
-  - Contexts only talk through domain events on a synchronous in-memory bus, or through another
-    context's public application/ API. Never import another context's internals (enforced by
-    import-linter).
+  - Composition root app/bootstrap.py (Container + wire): binds adapters to use cases and adapts one
+    context's ports to another's public API. app/main.py is the composition edge (startup, scheduled
+    sync, flows orchestrated across contexts such as POST /api/rules).
+  - Cross-context interaction: ports adapted in the composition root (queries and commands that must
+    answer), or events on the bus published after commit (reactions that need not answer).
+    Contexts never import each other's internals; enforced by import-linter with no exceptions.
+  - Stats has no tables: it reads other contexts' published read models through its ports.
   - Translation of the Enable Banking format (from `raw`) lives in transactions (its own ACL);
-    banking only fetches and publishes raw transactions.
-  - TDD: domain and use cases tested with in-memory repos; adapters against real Postgres
-    (testcontainers); schema managed with Alembic migrations.
+    banking fetches raw transactions and hands them to transactions.
+  - TDD: domain and use cases tested with in-memory adapters; HTTP characterization tests (one per spec
+    scenario) against real Postgres (testcontainers); schema managed with Alembic migrations.
   - Tooling: uv + pyproject, ruff, mypy strict, pytest + coverage, import-linter.
 
 rules:
