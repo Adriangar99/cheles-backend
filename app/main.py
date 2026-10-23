@@ -140,9 +140,16 @@ def serialize_connection(c: BankConnection) -> dict:
 
 @app.get("/api/banks")
 def list_banks(db: Session = Depends(get_db), _: User = Depends(current_user)):
-    connections = db.scalars(select(BankConnection).options(joinedload(BankConnection.accounts)).order_by(BankConnection.id)).unique().all()
+    connections = (
+        db.scalars(select(BankConnection).options(joinedload(BankConnection.accounts)).order_by(BankConnection.id))
+        .unique()
+        .all()
+    )
     orphans = db.scalars(select(Account).where(Account.connection_id.is_(None))).all()
-    return {"connections": [serialize_connection(c) for c in connections], "detached_accounts": [serialize_account(a) for a in orphans]}
+    return {
+        "connections": [serialize_connection(c) for c in connections],
+        "detached_accounts": [serialize_account(a) for a in orphans],
+    }
 
 
 @app.get("/api/banks/available")
@@ -208,7 +215,11 @@ def bank_callback(
         if account is None and iban:
             account = db.scalar(select(Account).where(Account.iban == iban))
         if account is None:
-            account = Account(identification_hash=ident, name=acc.get("name") or pending.aspsp_name, currency=acc.get("currency") or "EUR")
+            account = Account(
+                identification_hash=ident,
+                name=acc.get("name") or pending.aspsp_name,
+                currency=acc.get("currency") or "EUR",
+            )
             db.add(account)
         account.connection_id = connection.id
         account.eb_uid = acc["uid"]

@@ -25,8 +25,12 @@ def month_summary(db: Session, month: str) -> dict:
     start, end = month_bounds(month)
     in_month = (Transaction.booking_date >= start, Transaction.booking_date < end)
 
-    income = db.scalar(_counted(select(func.coalesce(func.sum(Transaction.amount), 0))).where(*in_month, Transaction.amount > 0))
-    expenses = db.scalar(_counted(select(func.coalesce(func.sum(Transaction.amount), 0))).where(*in_month, Transaction.amount < 0))
+    income = db.scalar(
+        _counted(select(func.coalesce(func.sum(Transaction.amount), 0))).where(*in_month, Transaction.amount > 0)
+    )
+    expenses = db.scalar(
+        _counted(select(func.coalesce(func.sum(Transaction.amount), 0))).where(*in_month, Transaction.amount < 0)
+    )
 
     # Ahorro del mes: lo que entra menos lo que sale de las cuentas de ahorro (transferencias propias)
     saved = db.scalar(
@@ -37,8 +41,9 @@ def month_summary(db: Session, month: str) -> dict:
 
     by_category = db.execute(
         _counted(
-            select(Category.id, Category.name, Category.icon, Category.color, func.sum(Transaction.amount))
-            .join(Category, Category.id == Transaction.category_id, isouter=True)
+            select(Category.id, Category.name, Category.icon, Category.color, func.sum(Transaction.amount)).join(
+                Category, Category.id == Transaction.category_id, isouter=True
+            )
         )
         .where(*in_month, Transaction.amount < 0)
         .group_by(Category.id, Category.name, Category.icon, Category.color)
@@ -52,7 +57,13 @@ def month_summary(db: Session, month: str) -> dict:
         "net": income + expenses,
         "saved": saved,
         "by_category": [
-            {"id": cid, "name": name or "Sin categoría", "icon": icon or "•", "color": color or "#8a8a8a", "amount": -total}
+            {
+                "id": cid,
+                "name": name or "Sin categoría",
+                "icon": icon or "•",
+                "color": color or "#8a8a8a",
+                "amount": -total,
+            }
             for cid, name, icon, color, total in by_category
         ],
     }
