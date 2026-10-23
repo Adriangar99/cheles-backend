@@ -77,7 +77,7 @@ include_external_packages = true
 [[tool.importlinter.contracts]]
 name = "Context layers depend only downwards"
 type = "layers"
-containers = ["app.identity", "app.categorization"]
+containers = ["app.identity", "app.categorization", "app.transactions"]
 layers = ["public", "infrastructure", "application", "domain"]
 
 [[tool.importlinter.contracts]]
@@ -88,14 +88,16 @@ source_modules = [
     "app.identity.application",
     "app.categorization.domain",
     "app.categorization.application",
+    "app.transactions.domain",
+    "app.transactions.application",
 ]
 forbidden_modules = ["fastapi", "starlette", "pydantic", "sqlalchemy", "httpx", "argon2", "pyotp", "qrcode", "alembic"]
 
 [[tool.importlinter.contracts]]
 name = "Contexts do not depend on legacy modules"
 type = "forbidden"
-source_modules = ["app.identity", "app.categorization"]
-forbidden_modules = ["app.main", "app.cli", "app.models", "app.sync", "app.stats", "app.enablebanking"]
+source_modules = ["app.identity", "app.categorization", "app.transactions"]
+forbidden_modules = ["app.main", "app.cli", "app.models", "app.sync", "app.stats", "app.enablebanking", "app.legacy_bridge"]
 
 [[tool.importlinter.contracts]]
 # app.bootstrap is the composition root and may wire context internals
@@ -109,19 +111,74 @@ forbidden_modules = [
     "app.categorization.domain",
     "app.categorization.application",
     "app.categorization.infrastructure",
+    "app.transactions.domain",
+    "app.transactions.application",
+    "app.transactions.infrastructure",
+]
+allow_indirect_imports = true
+# Transitional, read-only: stats aggregates the transactions table until stats becomes its own read model
+ignore_imports = ["app.stats -> app.transactions.infrastructure.orm"]
+
+[[tool.importlinter.contracts]]
+name = "Identity uses other contexts only through their public API"
+type = "forbidden"
+source_modules = ["app.identity"]
+forbidden_modules = [
+    "app.categorization.domain",
+    "app.categorization.application",
+    "app.categorization.infrastructure",
+    "app.transactions.domain",
+    "app.transactions.application",
+    "app.transactions.infrastructure",
 ]
 allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
-name = "Categorization uses identity only through its public API"
+name = "Categorization uses other contexts only through their public API"
 type = "forbidden"
 source_modules = ["app.categorization"]
-forbidden_modules = ["app.identity.domain", "app.identity.application", "app.identity.infrastructure"]
+forbidden_modules = [
+    "app.identity.domain",
+    "app.identity.application",
+    "app.identity.infrastructure",
+    "app.transactions.domain",
+    "app.transactions.application",
+    "app.transactions.infrastructure",
+]
 allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
-name = "Identity uses categorization only through its public API"
+name = "Transactions uses other contexts only through their public API"
 type = "forbidden"
-source_modules = ["app.identity"]
-forbidden_modules = ["app.categorization.domain", "app.categorization.application", "app.categorization.infrastructure"]
+source_modules = ["app.transactions"]
+forbidden_modules = [
+    "app.identity.domain",
+    "app.identity.application",
+    "app.identity.infrastructure",
+    "app.categorization.domain",
+    "app.categorization.application",
+    "app.categorization.infrastructure",
+]
 allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "The shared kernel depends on nothing else in the app nor on frameworks"
+type = "forbidden"
+source_modules = ["app.shared"]
+forbidden_modules = [
+    "app.identity",
+    "app.categorization",
+    "app.transactions",
+    "app.bootstrap",
+    "app.main",
+    "app.cli",
+    "app.models",
+    "app.sync",
+    "app.stats",
+    "app.enablebanking",
+    "fastapi",
+    "starlette",
+    "pydantic",
+    "sqlalchemy",
+    "httpx",
+]

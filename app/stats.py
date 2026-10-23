@@ -7,7 +7,11 @@ from sqlalchemy.orm import Session
 
 from app import bootstrap
 from app.categorization.public import CategoryLabel
-from app.models import Account, Transaction
+from app.models import Account
+
+# Transitional read-only exception (see [tool.importlinter]): stats aggregates the transactions table directly
+# until stats becomes its own read model.
+from app.transactions.infrastructure.orm import TransactionRow as Transaction
 
 
 def month_bounds(month: str) -> tuple[date, date]:

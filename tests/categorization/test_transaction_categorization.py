@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 import app.main
 from app.categorization.infrastructure.orm import CategoryRow as Category
 from app.categorization.infrastructure.orm import RuleRow as Rule
-from app.models import Transaction
+from app.transactions.infrastructure.orm import TransactionRow as Transaction
 from tests.fakes import FakeAccount, FakeEnableBanking
 from tests.helpers import connect_bank, login, raw_tx
 

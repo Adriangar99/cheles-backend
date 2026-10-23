@@ -8,7 +8,7 @@ from typing import Any, Literal
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from pydantic import BaseModel
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app import stats
@@ -22,9 +22,9 @@ from app.models import (
     Account,
     BankConnection,
     PendingAuth,
-    Transaction,
 )
-from app.sync import normalize_iban, reprocess_all, sync_all, sync_connection
+from app.shared.ids import CategoryId
+from app.sync import normalize_iban, sync_all, sync_connection
 
 log = logging.getLogger("cheles")
 settings = get_settings()
@@ -33,7 +33,7 @@ settings = get_settings()
 def scheduled_sync() -> None:
     with SessionLocal() as db:
         try:
-            log.info("Sincronización programada: %s movimientos nuevos", sync_all(db))
+            log.info("Sincronización programada: %s movimientos nuevos", sync_all(db, current().transactions()))
         except Exception:
             log.exception("Falló la sincronización programada")
 
@@ -175,7 +175,7 @@ def bank_callback(
     db.delete(pending)
     db.commit()
     try:
-        sync_connection(db, connection)
+        sync_connection(db, connection, current().transactions())
     except Exception:
         log.exception("Falló la primera sincronización")
     return redirect("connected=1")
@@ -188,17 +188,13 @@ def sync_one(
     connection = db.get(BankConnection, connection_id)
     if not connection:
         raise HTTPException(404)
-    return {"new": sync_connection(db, connection), "status": connection.status, "error": connection.last_error}
+    new = sync_connection(db, connection, current().transactions())
+    return {"new": new, "status": connection.status, "error": connection.last_error}
 
 
 @app.post("/api/sync", response_model=None)
 def sync_everything(db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_user)) -> dict[str, Any]:
-    return {"new": sync_all(db)}
-
-
-@app.post("/api/reprocess", response_model=None)
-def reprocess(db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_user)) -> dict[str, Any]:
-    return {"processed": reprocess_all(db)}
+    return {"new": sync_all(db, current().transactions())}
 
 
 class AccountPatch(BaseModel):
@@ -224,89 +220,11 @@ def patch_account(
         changed_iban = True
     db.commit()
     if changed_iban:
-        reprocess_all(db)
+        current().transactions().reprocess_all()
     return serialize_account(account)
 
 
 # ---------- Movimientos y categorías ----------
-
-
-def serialize_tx(t: Transaction) -> dict[str, Any]:
-    return {
-        "id": t.id,
-        "date": t.booking_date,
-        "amount": t.amount,
-        "currency": t.currency,
-        "status": t.status,
-        "counterparty": t.counterparty,
-        "description": t.description,
-        "kind": t.kind,
-        "category_id": t.category_id,
-        "category_manual": t.category_manual,
-        "account_id": t.account_id,
-        "account": t.account.alias or t.account.name,
-        "note": t.note,
-    }
-
-
-@app.get("/api/transactions", response_model=None)
-def list_transactions(
-    month: str | None = Query(None, pattern=r"^\d{4}-\d{2}$"),
-    q: str | None = None,
-    category_id: int | None = None,
-    account_id: int | None = None,
-    kind: Literal["normal", "transfer"] | None = None,
-    limit: int = Query(100, le=500),
-    offset: int = 0,
-    db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_user),
-) -> list[dict[str, Any]]:
-    stmt = select(Transaction).options(joinedload(Transaction.account))
-    if month:
-        start, end = stats.month_bounds(month)
-        stmt = stmt.where(Transaction.booking_date >= start, Transaction.booking_date < end)
-    if q:
-        like = f"%{q}%"
-        stmt = stmt.where(or_(Transaction.counterparty.ilike(like), Transaction.description.ilike(like)))
-    if category_id:
-        stmt = stmt.where(Transaction.category_id == category_id)
-    if account_id:
-        stmt = stmt.where(Transaction.account_id == account_id)
-    if kind:
-        stmt = stmt.where(Transaction.kind == kind)
-    stmt = stmt.order_by(Transaction.booking_date.desc(), Transaction.id.desc()).limit(limit).offset(offset)
-    return [serialize_tx(t) for t in db.scalars(stmt).unique()]
-
-
-class TxPatch(BaseModel):
-    category_id: int | None = None
-    clear_category: bool = False  # volver a la categoría automática
-    kind: Literal["normal", "transfer"] | None = None
-    note: str | None = None
-
-
-@app.patch("/api/transactions/{tx_id}", response_model=None)
-def patch_transaction(
-    tx_id: int, body: TxPatch, db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_user)
-) -> dict[str, Any]:
-    tx = db.get(Transaction, tx_id)
-    if not tx:
-        raise HTTPException(404)
-    if body.category_id is not None:
-        if not current().categorization().category_exists(body.category_id):
-            raise HTTPException(400, "Categoría inexistente")
-        tx.category_id = body.category_id
-        tx.category_manual = True
-    if body.clear_category:
-        tx.category_manual = False
-    if body.kind is not None:
-        tx.kind = body.kind
-    if body.note is not None:
-        tx.note = body.note or None
-    db.commit()
-    if body.clear_category:
-        reprocess_all(db)
-    return serialize_tx(tx)
 
 
 class RuleBody(BaseModel):
@@ -315,15 +233,13 @@ class RuleBody(BaseModel):
 
 
 @app.post("/api/rules", response_model=None)
-def create_rule(
-    body: RuleBody, db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_user)
-) -> dict[str, Any]:
+def create_rule(body: RuleBody, _: AuthenticatedUser = Depends(require_user)) -> dict[str, Any]:
     """Creates a high-priority rule, then reprocesses so it applies to the whole history."""
     try:
-        current().categorization().create_rule(body.pattern, body.category_id)
+        current().categorization().create_rule(body.pattern, CategoryId(body.category_id))
     except UnknownCategory:
         raise HTTPException(400, "Categoría inexistente") from None
-    return {"processed": reprocess_all(db)}
+    return {"processed": current().transactions().reprocess_all()}
 
 
 # ---------- Estadísticas ----------
