@@ -12,8 +12,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from app.models import User
-from app.security import hash_password
+from app.bootstrap import Container
 from tests.fakes import FakeAccount, FakeEnableBanking
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -51,11 +50,8 @@ class ClientIpFromHeader:
 
 
 def create_user(db: Session, username: str = "ana", password: str = PASSWORD) -> str:
-    """Stores the single user directly and returns its TOTP secret."""
-    secret = pyotp.random_base32()
-    db.add(User(username=username, password_hash=hash_password(password), totp_secret=secret))
-    db.commit()
-    return secret
+    """Creates the single user through the identity use case and returns its TOTP secret."""
+    return Container.from_environment().identity().create_user(username, password).secret
 
 
 def login(client: TestClient, db: Session, username: str = "ana") -> str:

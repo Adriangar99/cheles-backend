@@ -18,6 +18,25 @@ compose file creates (alias `api`, port 8000). **Always start the backend first*
 Both repos share the Compose project name `cheles`, so `api`, `db` and `web` show up together. Never run
 `docker compose down --remove-orphans` from one repo: it would also remove the other repo's containers.
 
+## Architecture
+
+DDD with a hexagonal architecture per bounded context, migrated incrementally. `identity` is the reference; the
+other contexts (banking, transactions, categorization, stats) still live in the flat legacy modules of `app/`.
+
+    app/identity/
+      domain/           # entities, value objects and rules; plain Python, no frameworks
+      application/      # use cases and the ports (Protocols) they depend on
+      infrastructure/   # adapters: SQLAlchemy rows and repositories, argon2/pyotp, FastAPI router, CLI
+      public.py         # the only part of the context the rest of the app may import
+    app/bootstrap.py    # composition root: builds adapters, binds use cases, wires FastAPI dependencies
+
+- Domain entities are dataclasses; ORM rows live in `infrastructure/orm.py` and repositories translate between them.
+- FastAPI routes depend on placeholder providers that `bootstrap.wire(app, container)` overrides, so tests can wire
+  their own `Container` (e.g. with a fake clock).
+- `uv run lint-imports` enforces the rules (see `[tool.importlinter]` in `pyproject.toml`): layers only depend
+  downwards, domain and application import no frameworks, a context never imports legacy modules, and legacy code
+  reaches a context only through its `public.py`.
+
 ## Development
 
 Requires [uv](https://docs.astral.sh/uv/) and Docker (the tests start a throwaway Postgres with testcontainers).
@@ -26,6 +45,7 @@ Requires [uv](https://docs.astral.sh/uv/) and Docker (the tests start a throwawa
     uv run pytest --cov                  # tests + coverage (fails below the ratchet in pyproject.toml)
     uv run ruff check . && uv run ruff format --check .
     uv run mypy                          # strict, over app/, migrations/ and tests/
+    uv run lint-imports                  # architecture contracts (pyproject.toml, [tool.importlinter])
 
 CI (GitHub Actions) runs the same checks on every pull request and on `main`.
 

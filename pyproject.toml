@@ -20,6 +20,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "import-linter>=2.1",
     "mypy>=1.14",
     "pytest>=8.3",
     "pytest-cov>=6.0",
@@ -68,3 +69,37 @@ branch = true
 fail_under = 94
 show_missing = true
 skip_covered = true
+
+[tool.importlinter]
+root_package = "app"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Identity layers depend only downwards"
+type = "layers"
+layers = [
+    "app.identity.public",
+    "app.identity.infrastructure",
+    "app.identity.application",
+    "app.identity.domain",
+]
+
+[[tool.importlinter.contracts]]
+name = "Identity domain and application are framework-free"
+type = "forbidden"
+source_modules = ["app.identity.domain", "app.identity.application"]
+forbidden_modules = ["fastapi", "starlette", "pydantic", "sqlalchemy", "httpx", "argon2", "pyotp", "qrcode", "alembic"]
+
+[[tool.importlinter.contracts]]
+name = "Identity does not depend on legacy modules"
+type = "forbidden"
+source_modules = ["app.identity"]
+forbidden_modules = ["app.main", "app.cli", "app.models", "app.sync", "app.stats", "app.categorize", "app.enablebanking"]
+
+[[tool.importlinter.contracts]]
+# app.bootstrap is the composition root and may wire identity internals
+name = "Legacy modules use identity only through its public API"
+type = "forbidden"
+source_modules = ["app.main", "app.cli", "app.models", "app.sync", "app.stats", "app.categorize", "app.enablebanking"]
+forbidden_modules = ["app.identity.domain", "app.identity.application", "app.identity.infrastructure"]
+allow_indirect_imports = true

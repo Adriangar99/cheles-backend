@@ -1,5 +1,6 @@
 """Characterization of `identity/user-authentication`."""
 
+import dataclasses
 import getpass
 import hashlib
 from datetime import UTC, datetime, timedelta
@@ -16,8 +17,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 import app.cli
-import app.security
-from app.models import LoginSession, User
+import app.main
+from app.bootstrap import Container, wire
+from app.identity.infrastructure.orm import LoginSessionRow as LoginSession
+from app.identity.infrastructure.orm import UserRow as User
+from app.identity.infrastructure.security import SystemClock
 from tests.helpers import PASSWORD, create_user, login
 
 NOW = datetime(2026, 10, 23, 12, 0, tzinfo=UTC)
@@ -303,7 +307,12 @@ def test_blocked_after_5_failures(client: TestClient, db: Session) -> None:
 def test_sliding_window(client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
     """Scenario: Sliding window"""
     clock = SimpleNamespace(now=1000.0)
-    monkeypatch.setattr(app.security, "time", SimpleNamespace(monotonic=lambda: clock.now))
+
+    class SteppedClock(SystemClock):
+        def monotonic(self) -> float:
+            return float(clock.now)
+
+    wire(app.main.app, dataclasses.replace(Container.from_environment(), clock=SteppedClock()))
     secret = create_user(db)
     fail_logins(client, 1)
     clock.now += 600
