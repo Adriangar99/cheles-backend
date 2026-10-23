@@ -95,13 +95,13 @@ forbidden_modules = ["fastapi", "starlette", "pydantic", "sqlalchemy", "httpx", 
 name = "Contexts do not depend on legacy modules"
 type = "forbidden"
 source_modules = ["app.identity", "app.categorization"]
-forbidden_modules = ["app.main", "app.cli", "app.models", "app.sync", "app.stats", "app.categorize", "app.enablebanking"]
+forbidden_modules = ["app.main", "app.cli", "app.models", "app.sync", "app.stats", "app.enablebanking"]
 
 [[tool.importlinter.contracts]]
 # app.bootstrap is the composition root and may wire context internals
 name = "Legacy modules use contexts only through their public API"
 type = "forbidden"
-source_modules = ["app.main", "app.cli", "app.models", "app.sync", "app.stats", "app.categorize", "app.enablebanking"]
+source_modules = ["app.main", "app.cli", "app.models", "app.sync", "app.stats", "app.enablebanking"]
 forbidden_modules = [
     "app.identity.domain",
     "app.identity.application",

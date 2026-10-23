@@ -12,9 +12,9 @@ rewritten; moved code is covered by the characterization tests. Commit before an
 
 ## 2. Infrastructure and legacy switch-over
 
-- [ ] 2.1 Move `Category`/`Rule` to `CategoryRow`/`RuleRow` in `app/categorization/infrastructure/orm.py`, add the repositories and unit of work, remove the `Transaction.category` relationship, and register the module in `migrations/env.py`; verify `uv run alembic check` against a migrated scratch database reports no changes
-- [ ] 2.2 Add the `GET /api/categories` router with its placeholder dependency, extend `Container`/`wire()` with categorization services and the transitional `bootstrap.current()`, and switch the legacy code (lifespan seeding, `POST /api/rules`, transaction PATCH validation, sync and reprocess, stats labels) to `app.categorization.public`; delete `app/categorize.py`
-- [ ] 2.3 Adapt the characterization tests (imports, conftest seeding, category-name lookups instead of the removed relationship) without changing any expected value; verify the whole suite passes, ruff, mypy and lint-imports pass, and `git diff tests/` shows no changed expected values
+- [x] 2.1 Move `Category`/`Rule` to `CategoryRow`/`RuleRow` in `app/categorization/infrastructure/orm.py`, add the repositories and unit of work, remove the `Transaction.category` relationship, and register the module in `migrations/env.py`; verify `uv run alembic check` against a migrated scratch database reports no changes
+- [x] 2.2 Add the `GET /api/categories` router with its placeholder dependency, extend `Container`/`wire()` with categorization services and the transitional `bootstrap.current()`, and switch the legacy code (lifespan seeding, `POST /api/rules`, transaction PATCH validation, sync and reprocess, stats labels) to `app.categorization.public`; delete `app/categorize.py`
+- [x] 2.3 Adapt the characterization tests (imports, conftest seeding, category-name lookups instead of the removed relationship) without changing any expected value; verify the whole suite passes, ruff, mypy and lint-imports pass, and `git diff tests/` shows no changed expected values
 
 ## 3. Documentation and verification
 

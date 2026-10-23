@@ -5,7 +5,9 @@ from typing import Any, cast
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
-from app.models import Account, Category, Transaction
+from app import bootstrap
+from app.categorization.public import CategoryLabel
+from app.models import Account, Transaction
 
 
 def month_bounds(month: str) -> tuple[date, date]:
@@ -20,6 +22,13 @@ def _counted[T: tuple[Any, ...]](stmt: Select[T]) -> Select[T]:
     return stmt.join(Account, Account.id == Transaction.account_id).where(
         Transaction.kind == "normal", Account.role != "excluded"
     )
+
+
+def _label(label: CategoryLabel | None) -> dict[str, Any]:
+    """Spending without a category is shown as «Sin categoría» (a stats presentation choice)."""
+    if label is None:
+        return {"id": None, "name": "Sin categoría", "icon": "•", "color": "#8a8a8a"}
+    return {"id": label.id, "name": label.name, "icon": label.icon, "color": label.color}
 
 
 def month_summary(db: Session, month: str) -> dict[str, Any]:
@@ -47,16 +56,17 @@ def month_summary(db: Session, month: str) -> dict[str, Any]:
         .where(*in_month, Transaction.kind == "transfer", Account.role == "savings")
     )
 
-    by_category = db.execute(
-        _counted(
-            select(Category.id, Category.name, Category.icon, Category.color, func.sum(Transaction.amount)).join(
-                Category, Category.id == Transaction.category_id, isouter=True
-            )
-        )
+    spending_by_category = db.execute(
+        _counted(select(Transaction.category_id, func.sum(Transaction.amount)))
         .where(*in_month, Transaction.amount < 0)
-        .group_by(Category.id, Category.name, Category.icon, Category.color)
+        .group_by(Transaction.category_id)
         .order_by(func.sum(Transaction.amount))
     ).all()
+    labels = (
+        bootstrap.current()
+        .categorization()
+        .category_labels({cid for cid, _ in spending_by_category if cid is not None})
+    )
 
     return {
         "month": month,
@@ -65,14 +75,8 @@ def month_summary(db: Session, month: str) -> dict[str, Any]:
         "net": income + expenses,
         "saved": saved,
         "by_category": [
-            {
-                "id": cid,
-                "name": name or "Sin categoría",
-                "icon": icon or "•",
-                "color": color or "#8a8a8a",
-                "amount": -total,
-            }
-            for cid, name, icon, color, total in by_category
+            {**_label(labels.get(cid) if cid is not None else None), "amount": -total}
+            for cid, total in spending_by_category
         ],
     }
 

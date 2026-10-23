@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 import app.main
+from app.categorization.infrastructure.orm import CategoryRow
 from app.enablebanking import EnableBankingClient
 from app.models import Account, BankConnection, Transaction
 from tests.fakes import FakeAccount, FakeEnableBanking
@@ -260,8 +261,9 @@ def test_new_transaction(client: TestClient, db: Session, fake_bank: FakeEnableB
     assert result["new"] == 1
     transaction = db.scalars(select(Transaction)).one()
     assert transaction.kind == "normal"
-    assert transaction.category is not None
-    assert transaction.category.name == "Supermercado"
+    category = db.get(CategoryRow, transaction.category_id) if transaction.category_id else None
+    assert category is not None
+    assert category.name == "Supermercado"
 
 
 # ---------- Replacing pending transactions ----------

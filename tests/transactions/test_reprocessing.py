@@ -6,7 +6,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
-from app.models import Account, Category, Transaction
+from app.categorization.infrastructure.orm import CategoryRow as Category
+from app.db import SessionLocal
+from app.models import Account, Transaction
 from tests.fakes import FakeAccount, FakeEnableBanking
 from tests.helpers import connect_bank, login, raw_tx
 
@@ -31,7 +33,11 @@ def by_reference(db: Session, reference: str) -> Transaction:
 
 
 def category_name(transaction: Transaction) -> str | None:
-    return transaction.category.name if transaction.category else None
+    if transaction.category_id is None:
+        return None
+    with SessionLocal() as db:
+        category = db.get(Category, transaction.category_id)
+        return category.name if category else None
 
 
 # ---------- Reprocessing from the original payload ----------

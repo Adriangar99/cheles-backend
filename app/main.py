@@ -12,8 +12,8 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app import stats
-from app.bootstrap import Container, wire
-from app.categorize import seed_categories
+from app.bootstrap import Container, current, wire
+from app.categorization.public import UnknownCategory
 from app.config import get_settings
 from app.db import SessionLocal, get_db
 from app.enablebanking import EnableBankingClient, EnableBankingError
@@ -21,9 +21,7 @@ from app.identity.public import AuthenticatedUser, require_user
 from app.models import (
     Account,
     BankConnection,
-    Category,
     PendingAuth,
-    Rule,
     Transaction,
 )
 from app.sync import normalize_iban, reprocess_all, sync_all, sync_connection
@@ -42,8 +40,7 @@ def scheduled_sync() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    with SessionLocal() as db:
-        seed_categories(db)
+    current().categorization().seed_default_catalog()
     scheduler = BackgroundScheduler()
     scheduler.add_job(scheduled_sync, "cron", hour=settings.sync_hours)
     scheduler.start()
@@ -296,7 +293,7 @@ def patch_transaction(
     if not tx:
         raise HTTPException(404)
     if body.category_id is not None:
-        if not db.get(Category, body.category_id):
+        if not current().categorization().category_exists(body.category_id):
             raise HTTPException(400, "Categoría inexistente")
         tx.category_id = body.category_id
         tx.category_manual = True
@@ -312,16 +309,6 @@ def patch_transaction(
     return serialize_tx(tx)
 
 
-@app.get("/api/categories", response_model=None)
-def list_categories(
-    db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_user)
-) -> list[dict[str, Any]]:
-    return [
-        {"id": c.id, "name": c.name, "kind": c.kind, "icon": c.icon, "color": c.color}
-        for c in db.scalars(select(Category).order_by(Category.kind.desc(), Category.name))
-    ]
-
-
 class RuleBody(BaseModel):
     pattern: str
     category_id: int
@@ -331,11 +318,11 @@ class RuleBody(BaseModel):
 def create_rule(
     body: RuleBody, db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_user)
 ) -> dict[str, Any]:
-    """Crea una regla (con prioridad alta) y reprocesa para aplicarla a todo el histórico."""
-    if not db.get(Category, body.category_id):
-        raise HTTPException(400, "Categoría inexistente")
-    db.add(Rule(pattern=body.pattern.strip(), category_id=body.category_id, priority=10))
-    db.commit()
+    """Creates a high-priority rule, then reprocesses so it applies to the whole history."""
+    try:
+        current().categorization().create_rule(body.pattern, body.category_id)
+    except UnknownCategory:
+        raise HTTPException(400, "Categoría inexistente") from None
     return {"processed": reprocess_all(db)}
 
 
