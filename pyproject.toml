@@ -64,5 +64,7 @@ source = ["app"]
 branch = true
 
 [tool.coverage.report]
+# Ratchet: the measured coverage rounded down; raise it as coverage grows, never lower it
+fail_under = 94
 show_missing = true
 skip_covered = true
