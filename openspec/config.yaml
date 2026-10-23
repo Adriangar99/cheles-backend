@@ -1,0 +1,34 @@
+schema: spec-driven
+
+context: |
+  Cheles: web personal para ver las cuentas bancarias del propio usuario (BBVA, Revolut…)
+  vía Enable Banking. Un único usuario, solo accesible desde su Mac.
+  Este repo es solo el backend: FastAPI + Postgres, Docker Compose. El frontend está en el repo cheles-frontend; la API solo se comparte con él por la red Docker `cheles-net`.
+  Escribe todos los artefactos (proposal, specs, design, tasks) en español.
+  Restricciones que no se deducen del código:
+  - Seguridad: la web solo en 127.0.0.1, la API nunca se publica, sesión con cookie
+    HttpOnly, login con contraseña + TOTP y límite de intentos por IP.
+  - Nunca versionar ni mostrar `.env` ni `secrets/` (claves privadas de Enable Banking).
+  - Los movimientos se guardan tal cual los da el banco (`raw`) para poder reprocesarlos
+    sin volver a pedirlos; los cambios de categorización/estadísticas deben partir de `raw`.
+  - Las transferencias entre cuentas propias (detectadas por IBAN) no cuentan como gasto
+    ni ingreso. Roles de cuenta: día a día, ahorro, no cuenta.
+
+rules:
+  proposal:
+    - Indicar siempre qué queda fuera de alcance
+    - Señalar si el cambio afecta a la superficie de seguridad (auth, exposición de puertos, secretos)
+  tasks:
+    - Incluir una tarea de verificación con `docker compose up -d --build`
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing

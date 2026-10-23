@@ -1,0 +1,53 @@
+# Mantiene el nombre de proyecto "cheles" para reutilizar el volumen db-data existente
+name: cheles
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cheles
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?define DB_PASSWORD en .env}
+      POSTGRES_DB: cheles
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cheles"]
+      interval: 5s
+      retries: 10
+    networks: [internal]
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://cheles:${DB_PASSWORD}@db:5432/cheles
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      EB_APPLICATION_ID: ${EB_APPLICATION_ID:-}
+      EB_COUNTRY: ${EB_COUNTRY:-ES}
+      TZ: Europe/Madrid
+    secrets:
+      - eb_private_key
+    # Sin puertos publicados: solo la web (repo cheles-frontend) llega a la API, por la red "cheles"
+    networks:
+      internal:
+      web:
+        aliases: [api]
+
+secrets:
+  eb_private_key:
+    file: ./secrets/eb_private_key.pem
+
+volumes:
+  db-data:
+
+networks:
+  # La base de datos no es visible desde la web
+  internal:
+  # Red compartida con cheles-frontend; la crea este compose
+  web:
+    name: cheles-net
