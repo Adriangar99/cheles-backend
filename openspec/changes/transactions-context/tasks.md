@@ -22,7 +22,7 @@ for `YearMonth`. Commit before any mutation check.
 ## 4. Documentation and verification
 
 - [x] 4.1 Update the README architecture section (transactions and the shared kernel, `legacy_bridge`, the stats exception, orchestrated rules route); verify the paths it names exist
-- [ ] 4.2 Run `docker compose up -d --build`; verify the API starts, `/api/transactions` returns 401 without a session through the web app, and CI passes on the pull request
+- [x] 4.2 Run `docker compose up -d --build`; verify the API starts, `/api/transactions` returns 401 without a session through the web app, and CI passes on the pull request
 
 ## Workflow follow-up
 
