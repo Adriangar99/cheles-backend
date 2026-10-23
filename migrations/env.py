@@ -9,7 +9,8 @@ from app.db import Base
 
 config = context.config
 if config.config_file_name is not None and config.attributes.get("configure_logger", True):
-    fileConfig(config.config_file_name)
+    # Keep the app's own loggers working when migrations run inside an already configured process
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 
