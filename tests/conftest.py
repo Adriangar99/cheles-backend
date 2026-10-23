@@ -13,20 +13,12 @@ from testcontainers.community.postgres import PostgresContainer
 _postgres = PostgresContainer("postgres:16-alpine", driver="psycopg")
 _postgres.start()
 
-os.environ.update(
-    {
-        "DATABASE_URL": _postgres.get_connection_url(),
-        # Explicit values so a developer's local .env cannot change test results
-        "PUBLIC_URL": "http://localhost:3000",
-        "COOKIE_SECURE": "false",
-        "EB_APPLICATION_ID": "test-application",
-        "EB_COUNTRY": "ES",
-        "EB_CONSENT_DAYS": "180",
-        "SESSION_DAYS": "14",
-        "SYNC_HOURS": "7,19",
-        "INITIAL_HISTORY_DAYS": "730",
-    }
-)
+os.environ["DATABASE_URL"] = _postgres.get_connection_url()
+
+# Tests must not read a developer's local .env, so every other setting keeps the defaults defined in the code
+from app.config import Settings  # noqa: E402
+
+Settings.model_config["env_file"] = None
 
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402

@@ -39,12 +39,23 @@ class FakeEnableBanking:
     balances: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     calls: list[tuple[str, tuple[Any, ...]]] = field(default_factory=list)
     # Method name (optionally "method:uid") -> error raised on the next call(s)
-    _errors: dict[str, EnableBankingError] = field(default_factory=dict)
+    _errors: dict[str, Exception] = field(default_factory=dict)
 
     # ---- test setup helpers ----
 
-    def fail(self, method: str, status_code: int = 500, body: Any = "boom", uid: str | None = None) -> None:
-        self._errors[f"{method}:{uid}" if uid else method] = EnableBankingError(status_code, body)
+    def fail(
+        self,
+        method: str,
+        status_code: int = 500,
+        body: Any = "boom",
+        uid: str | None = None,
+        error: Exception | None = None,
+    ) -> None:
+        """Makes every later call to `method` (for one account uid, if given) raise an Enable Banking error."""
+        self._errors[f"{method}:{uid}" if uid else method] = error or EnableBankingError(status_code, body)
+
+    def recover(self) -> None:
+        self._errors.clear()
 
     def add_session(
         self, code: str, accounts: list[FakeAccount], valid_until: str = "2027-04-01T00:00:00+00:00"
