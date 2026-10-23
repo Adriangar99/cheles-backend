@@ -25,7 +25,6 @@ from sqlalchemy import text  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
 from app.bootstrap import Container, wire  # noqa: E402
-from app.categorize import seed_categories  # noqa: E402
 from app.db import SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from tests.fakes import FakeEnableBanking  # noqa: E402
@@ -61,12 +60,11 @@ def container() -> Container:
 
 
 @pytest.fixture(autouse=True)
-def clean_database() -> None:
+def clean_database(container: Container) -> None:
     """Every test starts from an empty database with the default categories."""
     with engine.begin() as connection:
         connection.execute(text(f"TRUNCATE {', '.join(APP_TABLES)} RESTART IDENTITY CASCADE"))
-    with SessionLocal() as db:
-        seed_categories(db)
+    container.categorization().seed_default_catalog()
 
 
 @pytest.fixture

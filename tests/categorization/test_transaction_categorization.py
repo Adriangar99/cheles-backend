@@ -9,7 +9,9 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 import app.main
-from app.models import Category, Rule, Transaction
+from app.categorization.infrastructure.orm import CategoryRow as Category
+from app.categorization.infrastructure.orm import RuleRow as Rule
+from app.models import Transaction
 from tests.fakes import FakeAccount, FakeEnableBanking
 from tests.helpers import connect_bank, login, raw_tx
 
@@ -42,7 +44,8 @@ def categorize(client: TestClient, db: Session, fake_bank: FakeEnableBanking) ->
         connect_bank(client, fake_bank, [FakeAccount(uid="u1", identification_hash="h1")], code=f"c{next(codes)}")
         db.expire_all()
         rows = db.scalars(select(Transaction).order_by(Transaction.id)).all()
-        return [t.category.name if t.category else None for t in rows]
+        names = {c.id: c.name for c in db.scalars(select(Category))}
+        return [names.get(t.category_id) if t.category_id else None for t in rows]
 
     return run
 
@@ -184,7 +187,8 @@ def test_new_rule(categorize: Any, client: TestClient, db: Session) -> None:
     rule = db.scalars(select(Rule).where(Rule.category_id == transport, Rule.priority == 10)).one()
     assert rule.pattern == "gasolinera pepe"
     db.expire_all()
-    names = [t.category.name for t in db.scalars(select(Transaction).order_by(Transaction.id)) if t.category]
+    by_id = {c.id: c.name for c in db.scalars(select(Category))}
+    names = [by_id[t.category_id] for t in db.scalars(select(Transaction).order_by(Transaction.id)) if t.category_id]
     assert names == ["Transporte", "Ocio"]
 
 

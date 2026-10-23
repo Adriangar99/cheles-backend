@@ -8,7 +8,6 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
-    Integer,
     Numeric,
     String,
     UniqueConstraint,
@@ -66,27 +65,6 @@ class Account(Base):
     connection: Mapped[BankConnection | None] = relationship(back_populates="accounts")
 
 
-class Category(Base):
-    __tablename__ = "categories"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(64), unique=True)
-    kind: Mapped[str] = mapped_column(String(16))  # expense | income
-    icon: Mapped[str] = mapped_column(String(8), default="•")
-    color: Mapped[str] = mapped_column(String(16), default="#8a8a8a")
-
-
-class Rule(Base):
-    """Si el texto del movimiento contiene `pattern`, se asigna la categoría."""
-
-    __tablename__ = "rules"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    pattern: Mapped[str] = mapped_column(String(128))
-    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id", ondelete="CASCADE"))
-    priority: Mapped[int] = mapped_column(Integer, default=100)
-
-
 class Transaction(Base):
     __tablename__ = "transactions"
     __table_args__ = (UniqueConstraint("account_id", "external_id"),)
@@ -111,4 +89,3 @@ class Transaction(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     account: Mapped[Account] = relationship()
-    category: Mapped[Category | None] = relationship()

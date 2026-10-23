@@ -4,6 +4,7 @@ from alembic import context
 from sqlalchemy import create_engine
 
 # Register every table on Base.metadata
+import app.categorization.infrastructure.orm
 import app.identity.infrastructure.orm
 import app.models  # noqa: F401
 from app.config import get_settings

@@ -7,7 +7,8 @@ from typing import Any, cast
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from app.categorize import Categorizer
+from app import bootstrap
+from app.categorization.public import CategorizationPolicy
 from app.config import get_settings
 from app.enablebanking import EnableBankingClient, EnableBankingError
 from app.models import Account, BankConnection, Transaction
@@ -63,11 +64,15 @@ def own_ibans(db: Session) -> set[str]:
     return {iban for iban in db.scalars(select(Account.iban)) if iban}
 
 
-def apply_derived_fields(tx: Transaction, ibans: set[str], categorizer: Categorizer) -> None:
+def apply_derived_fields(tx: Transaction, ibans: set[str], policy: CategorizationPolicy) -> None:
     """Campos calculados a partir de los datos del banco. No toca lo editado a mano."""
     tx.kind = "transfer" if tx.counterparty_iban and tx.counterparty_iban in ibans else "normal"
     if not tx.category_manual:
-        tx.category_id = None if tx.kind == "transfer" else categorizer.categorize(tx)
+        tx.category_id = (
+            None
+            if tx.kind == "transfer"
+            else policy.categorize(tx.counterparty, tx.description, is_income=tx.amount > 0)
+        )
 
 
 def _pick_balance(balances: list[dict[str, Any]]) -> Decimal | None:
@@ -97,7 +102,7 @@ def sync_account(db: Session, client: EnableBankingClient, account: Account) -> 
     db.execute(delete(Transaction).where(Transaction.account_id == account.id, Transaction.status == "PDNG"))
 
     ibans = own_ibans(db)
-    categorizer = Categorizer(db)
+    policy = bootstrap.current().categorization().load_policy()
     new_count = 0
     for raw in raws:
         data = normalize_transaction(raw)
@@ -113,7 +118,7 @@ def sync_account(db: Session, client: EnableBankingClient, account: Account) -> 
         else:
             for key, value in data.items():
                 setattr(tx, key, value)
-        apply_derived_fields(tx, ibans, categorizer)
+        apply_derived_fields(tx, ibans, policy)
 
     account.balance = _pick_balance(client.get_balances(uid))
     account.balance_at = datetime.now(UTC)
@@ -153,12 +158,12 @@ def sync_all(db: Session) -> int:
 def reprocess_all(db: Session) -> int:
     """Recalcula transferencias y categorías desde los datos crudos guardados."""
     ibans = own_ibans(db)
-    categorizer = Categorizer(db)
+    policy = bootstrap.current().categorization().load_policy()
     transactions = db.scalars(select(Transaction)).all()
     for tx in transactions:
         for key, value in normalize_transaction(tx.raw).items():
             if key != "external_id":
                 setattr(tx, key, value)
-        apply_derived_fields(tx, ibans, categorizer)
+        apply_derived_fields(tx, ibans, policy)
     db.commit()
     return len(transactions)
