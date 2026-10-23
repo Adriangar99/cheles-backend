@@ -6,7 +6,7 @@ for the event bus and the reconnection matching. Commit before any mutation chec
 ## 1. Event bus and banking domain
 
 - [x] 1.1 Write failing unit tests for `InMemoryEventBus` (subscribers of the published type run, others do not; a failing handler is logged and does not stop the rest), then implement `app/shared/events.py`; verify the tests and `lint-imports` pass
-- [ ] 1.2 Create `app/banking/` and extend the import contracts to it; write failing unit tests for reconnection matching (identification hash first, then normalized IBAN, new account otherwise; an incoming account without IBAN keeps the stored one), then implement the banking domain (`BankConnection`, `PendingAuthorization`, `Account`, `Iban`, sync policy, reconnection, `AccountIbanChanged`, errors); verify the tests, mypy and `lint-imports` pass
+- [x] 1.2 Create `app/banking/` and extend the import contracts to it; write failing unit tests for reconnection matching (identification hash first, then normalized IBAN, new account otherwise; an incoming account without IBAN keeps the stored one), then implement the banking domain (`BankConnection`, `PendingAuthorization`, `Account`, `Iban`, sync policy, reconnection, `AccountIbanChanged`, errors); verify the tests, mypy and `lint-imports` pass
 
 ## 2. Banking application
 
