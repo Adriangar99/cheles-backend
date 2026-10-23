@@ -8,7 +8,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Account, BankConnection, PendingAuth
+from app.banking.infrastructure.orm import AccountRow as Account
+from app.banking.infrastructure.orm import BankConnectionRow as BankConnection
+from app.banking.infrastructure.orm import PendingAuthRow as PendingAuth
 from app.transactions.infrastructure.orm import TransactionRow as Transaction
 from tests.fakes import FakeAccount, FakeEnableBanking
 from tests.helpers import connect_bank, login, raw_tx

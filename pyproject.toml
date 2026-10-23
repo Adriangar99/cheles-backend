@@ -77,7 +77,12 @@ include_external_packages = true
 [[tool.importlinter.contracts]]
 name = "Context layers depend only downwards"
 type = "layers"
-containers = ["app.identity", "app.categorization", "app.transactions"]
+containers = [
+    "app.identity",
+    "app.categorization",
+    "app.transactions",
+    "app.banking",
+]
 layers = ["public", "infrastructure", "application", "domain"]
 
 [[tool.importlinter.contracts]]
@@ -90,20 +95,46 @@ source_modules = [
     "app.categorization.application",
     "app.transactions.domain",
     "app.transactions.application",
+    "app.banking.domain",
+    "app.banking.application",
 ]
-forbidden_modules = ["fastapi", "starlette", "pydantic", "sqlalchemy", "httpx", "argon2", "pyotp", "qrcode", "alembic"]
+forbidden_modules = [
+    "fastapi",
+    "starlette",
+    "pydantic",
+    "sqlalchemy",
+    "httpx",
+    "argon2",
+    "pyotp",
+    "qrcode",
+    "alembic",
+    "jwt",
+]
 
 [[tool.importlinter.contracts]]
 name = "Contexts do not depend on legacy modules"
 type = "forbidden"
-source_modules = ["app.identity", "app.categorization", "app.transactions"]
-forbidden_modules = ["app.main", "app.cli", "app.models", "app.sync", "app.stats", "app.enablebanking", "app.legacy_bridge"]
+source_modules = [
+    "app.identity",
+    "app.categorization",
+    "app.transactions",
+    "app.banking",
+]
+forbidden_modules = [
+    "app.main",
+    "app.cli",
+    "app.stats",
+]
 
 [[tool.importlinter.contracts]]
 # app.bootstrap is the composition root and may wire context internals
 name = "Legacy modules use contexts only through their public API"
 type = "forbidden"
-source_modules = ["app.main", "app.cli", "app.models", "app.sync", "app.stats", "app.enablebanking"]
+source_modules = [
+    "app.main",
+    "app.cli",
+    "app.stats",
+]
 forbidden_modules = [
     "app.identity.domain",
     "app.identity.application",
@@ -114,10 +145,16 @@ forbidden_modules = [
     "app.transactions.domain",
     "app.transactions.application",
     "app.transactions.infrastructure",
+    "app.banking.domain",
+    "app.banking.application",
+    "app.banking.infrastructure",
 ]
 allow_indirect_imports = true
-# Transitional, read-only: stats aggregates the transactions table until stats becomes its own read model
-ignore_imports = ["app.stats -> app.transactions.infrastructure.orm"]
+# Transitional, read-only: stats aggregates other contexts' tables until stats becomes its own read model
+ignore_imports = [
+    "app.stats -> app.banking.infrastructure.orm",
+    "app.stats -> app.transactions.infrastructure.orm",
+]
 
 [[tool.importlinter.contracts]]
 name = "Identity uses other contexts only through their public API"
@@ -130,6 +167,9 @@ forbidden_modules = [
     "app.transactions.domain",
     "app.transactions.application",
     "app.transactions.infrastructure",
+    "app.banking.domain",
+    "app.banking.application",
+    "app.banking.infrastructure",
 ]
 allow_indirect_imports = true
 
@@ -144,6 +184,9 @@ forbidden_modules = [
     "app.transactions.domain",
     "app.transactions.application",
     "app.transactions.infrastructure",
+    "app.banking.domain",
+    "app.banking.application",
+    "app.banking.infrastructure",
 ]
 allow_indirect_imports = true
 
@@ -158,6 +201,26 @@ forbidden_modules = [
     "app.categorization.domain",
     "app.categorization.application",
     "app.categorization.infrastructure",
+    "app.banking.domain",
+    "app.banking.application",
+    "app.banking.infrastructure",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Banking uses other contexts only through their public API"
+type = "forbidden"
+source_modules = ["app.banking"]
+forbidden_modules = [
+    "app.identity.domain",
+    "app.identity.application",
+    "app.identity.infrastructure",
+    "app.categorization.domain",
+    "app.categorization.application",
+    "app.categorization.infrastructure",
+    "app.transactions.domain",
+    "app.transactions.application",
+    "app.transactions.infrastructure",
 ]
 allow_indirect_imports = true
 
@@ -169,16 +232,15 @@ forbidden_modules = [
     "app.identity",
     "app.categorization",
     "app.transactions",
+    "app.banking",
     "app.bootstrap",
     "app.main",
     "app.cli",
-    "app.models",
-    "app.sync",
     "app.stats",
-    "app.enablebanking",
     "fastapi",
     "starlette",
     "pydantic",
     "sqlalchemy",
     "httpx",
+    "argon2",
 ]

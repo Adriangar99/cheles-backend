@@ -1,4 +1,4 @@
-"""Cliente mínimo de la API de Enable Banking (https://enablebanking.com/docs/api/reference/)."""
+"""Minimal Enable Banking API client (https://enablebanking.com/docs/api/reference/); banking's BankingProvider."""
 
 import time
 from datetime import date, datetime
@@ -7,14 +7,8 @@ from typing import Any
 import httpx
 import jwt
 
+from app.banking.domain.errors import ProviderError
 from app.config import get_settings
-
-
-class EnableBankingError(Exception):
-    def __init__(self, status_code: int, body: Any):
-        self.status_code = status_code
-        self.body = body
-        super().__init__(f"Enable Banking {status_code}: {body}")
 
 
 class EnableBankingClient:
@@ -27,12 +21,12 @@ class EnableBankingClient:
         self._token_exp = 0
 
     def _jwt(self) -> str:
-        # El JWT dura como mucho 24 h; lo renovamos con margen
+        # The JWT lasts at most 24 h; renew it with some margin
         now = int(time.time())
         if self._token and now < self._token_exp - 300:
             return self._token
         if not self.application_id:
-            raise RuntimeError("Falta EB_APPLICATION_ID en la configuración")
+            raise RuntimeError("EB_APPLICATION_ID is not configured")
         with open(self.private_key_path, "rb") as f:
             private_key = f.read()
         self._token_exp = now + 3600
@@ -52,7 +46,7 @@ class EnableBankingClient:
                 body = response.json()
             except ValueError:
                 body = response.text
-            raise EnableBankingError(response.status_code, body)
+            raise ProviderError(response.status_code, body)
         return response.json()
 
     def list_aspsps(self, country: str) -> list[dict[str, Any]]:

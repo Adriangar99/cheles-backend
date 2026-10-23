@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from app.models import Account
+from app.banking.infrastructure.orm import AccountRow as Account
 from app.transactions.infrastructure.orm import TransactionRow as Transaction
 from tests.fakes import FakeAccount, FakeEnableBanking
 from tests.helpers import balance, connect_bank, login, raw_tx

@@ -20,34 +20,37 @@ Both repos share the Compose project name `cheles`, so `api`, `db` and `web` sho
 
 ## Architecture
 
-DDD with a hexagonal architecture per bounded context, migrated incrementally. `identity`, `categorization` and
-`transactions` are migrated (identity is the reference); banking and stats still live in the flat legacy modules of
-`app/` (`main.py`, `sync.py`, `stats.py`, `models.py`).
+DDD with a hexagonal architecture per bounded context, migrated incrementally. `identity`, `categorization`,
+`transactions` and `banking` are migrated (identity is the reference); stats still lives in the legacy modules
+`app/main.py` (stats and rules routes, startup) and `app/stats.py`.
 
     app/identity/
       domain/           # entities, value objects and rules; plain Python, no frameworks
       application/      # use cases and the ports (Protocols) they depend on
       infrastructure/   # adapters: SQLAlchemy rows and repositories, argon2/pyotp, FastAPI router, CLI
       public.py         # the only part of the context the rest of the app may import
-    app/shared/         # shared kernel: Money, YearMonth, typed ids (only concepts that mean the same everywhere)
-    app/bootstrap.py    # composition root: builds adapters, binds use cases, wires FastAPI dependencies
-    app/legacy_bridge.py  # adapters for context ports over legacy data (e.g. own accounts from legacy banking)
+    app/shared/         # shared kernel: Money, YearMonth, typed ids, event bus (only what means the same everywhere)
+    app/bootstrap.py    # composition root: builds adapters, binds use cases, wires FastAPI dependencies and events
+    app/orm_registry.py # every context's ORM rows, for Alembic
 
 - Domain entities are dataclasses; ORM rows live in `infrastructure/orm.py` and repositories translate between them.
 - FastAPI routes depend on placeholder providers that `bootstrap.wire(app, container)` overrides, so tests can wire
-  their own `Container` (e.g. with a fake clock).
+  their own `Container` (e.g. with a fake clock or the fake Enable Banking provider).
 - Contexts never import each other's internals nor legacy code. When a context needs data it does not own (own IBANs,
-  account names, category suggestions) it declares a port, and the composition root plugs in an adapter: another
-  context's public API, or `app/legacy_bridge.py` while the owner is still legacy.
+  account names, category suggestions, where to store synced transactions) it declares a port, and the composition
+  root plugs in an adapter over the owner's public API.
 - Cross-context flows that must answer the caller are orchestrated explicitly at the edge (e.g. `POST /api/rules`
-  creates the rule in categorization, then reprocesses in transactions); there is no event bus yet.
-- Legacy modules that need a context outside an HTTP request (startup seeding, sync, stats) get its services from
-  `bootstrap.current()`. This service locator is transitional: contexts never use it, and each use disappears when
-  that legacy consumer becomes a context.
+  creates the rule in categorization, then reprocesses in transactions).
+- Reactions that do not answer the caller go through the in-memory event bus (`app/shared/events.py`): publishers
+  publish after their unit of work commits, handlers run synchronously in their own transaction, and a failing
+  handler is logged without undoing the publisher's change. Subscriptions are wired in `bootstrap.Container`
+  (today: `AccountIbanChanged` → transactions reprocess).
+- Legacy modules that need a context outside an HTTP request (startup seeding, scheduled sync, stats) get its
+  services from `bootstrap.current()`. This service locator is transitional and disappears with the stats migration.
 - `uv run lint-imports` enforces the rules (see `[tool.importlinter]` in `pyproject.toml`): layers only depend
   downwards, domain and application import no frameworks, a context never imports legacy modules, and both legacy
   code and other contexts reach a context only through its `public.py`. The one transitional exception is stats
-  reading the transactions table directly, until stats is migrated.
+  reading the banking and transactions tables directly, until stats is migrated.
 
 ## Development
 

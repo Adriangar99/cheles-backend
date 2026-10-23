@@ -74,11 +74,10 @@ def db() -> Iterator[Session]:
 
 
 @pytest.fixture
-def fake_bank(monkeypatch: pytest.MonkeyPatch) -> FakeEnableBanking:
-    """Replaces Enable Banking everywhere the app instantiates its client."""
+def fake_bank(container: Container) -> FakeEnableBanking:
+    """Replaces Enable Banking as the container's banking provider."""
     fake = FakeEnableBanking()
-    monkeypatch.setattr("app.main.EnableBankingClient", lambda: fake)
-    monkeypatch.setattr("app.sync.EnableBankingClient", lambda: fake)
+    container.banking_provider = fake
     return fake
 
 

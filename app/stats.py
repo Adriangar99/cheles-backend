@@ -6,11 +6,11 @@ from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
 from app import bootstrap
-from app.categorization.public import CategoryLabel
-from app.models import Account
 
-# Transitional read-only exception (see [tool.importlinter]): stats aggregates the transactions table directly
-# until stats becomes its own read model.
+# Transitional read-only exception (see [tool.importlinter]): stats aggregates the banking and transactions tables
+# directly until stats becomes its own read model.
+from app.banking.infrastructure.orm import AccountRow as Account
+from app.categorization.public import CategoryLabel
 from app.transactions.infrastructure.orm import TransactionRow as Transaction
 
 

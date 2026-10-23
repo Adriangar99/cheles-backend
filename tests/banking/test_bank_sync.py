@@ -2,6 +2,7 @@
 
 import logging
 from datetime import UTC, date, datetime, timedelta
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -11,9 +12,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 import app.main
+from app.banking.infrastructure.enable_banking import EnableBankingClient
+from app.banking.infrastructure.orm import AccountRow as Account
+from app.banking.infrastructure.orm import BankConnectionRow as BankConnection
+from app.bootstrap import Container
 from app.categorization.infrastructure.orm import CategoryRow
-from app.enablebanking import EnableBankingClient
-from app.models import Account, BankConnection
 from app.transactions.infrastructure.orm import TransactionRow as Transaction
 from tests.fakes import FakeAccount, FakeEnableBanking
 from tests.helpers import balance, connect_bank, login, raw_tx
@@ -81,13 +84,15 @@ def test_scheduled_run(
     assert "Sincronización programada: 2 movimientos nuevos" in caplog.text
 
 
-def test_scheduled_sync_failures_are_logged(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+def test_scheduled_sync_failures_are_logged(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, container: Container
+) -> None:
     """A failure in the scheduled sync is logged and does not propagate (part of «Scheduled sync»)."""
 
-    def broken(db: Session, transactions: object) -> int:
+    def broken() -> int:
         raise RuntimeError("database down")
 
-    monkeypatch.setattr(app.main, "sync_all", broken)
+    monkeypatch.setattr(container, "banking", lambda: SimpleNamespace(sync_all=broken))
 
     app.main.scheduled_sync()
 
