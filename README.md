@@ -1,38 +1,47 @@
 # Cheles · backend
 
-API de Cheles (nombre provisional): FastAPI + Postgres. Login con contraseña + TOTP, sincronización con
-Enable Banking y estadísticas. El frontend vive en [cheles-frontend](https://github.com/Adriangar99/cheles-frontend).
+Cheles API (working name): FastAPI + Postgres. Password + TOTP login, sync with Enable Banking and statistics. The
+frontend lives in [cheles-frontend](https://github.com/Adriangar99/cheles-frontend).
 
-Los movimientos se guardan tal cual los da el banco (`raw`), así se puede reprocesar sin volver a pedirlos.
+Transactions are stored exactly as the bank returns them (`raw`), so they can be reprocessed without fetching them
+again.
 
-## Arrancar
+## Getting started
 
-    cp .env.example .env                 # y rellena DB_PASSWORD, EB_APPLICATION_ID…
+    cp .env.example .env                 # and fill in DB_PASSWORD, EB_APPLICATION_ID…
     docker compose up -d --build
-    docker compose run --rm api python -m app.cli create-user <usuario>   # contraseña + QR del 2FA
+    docker compose run --rm api python -m app.cli create-user <username>   # password + 2FA QR code
 
-La API no publica puertos: se expone solo a la web mediante la red Docker `cheles-net`, que crea este compose
-(alias `api`, puerto 8000). Arranca **siempre el backend primero**; luego el frontend.
+The API publishes no ports: it is only exposed to the web app through the Docker network `cheles-net`, which this
+compose file creates (alias `api`, port 8000). **Always start the backend first**, then the frontend.
 
-## Alta en Enable Banking (una vez)
+Both repos share the Compose project name `cheles`, so `api`, `db` and `web` show up together. Never run
+`docker compose down --remove-orphans` from one repo: it would also remove the other repo's containers.
 
-1. Entra en https://enablebanking.com/cp/applications y crea una aplicación.
-2. Sube `secrets/eb_certificate.pem`; la clave privada `secrets/eb_private_key.pem` no sale de tu Mac.
-3. Redirect URL: `http://localhost:3000/api/banks/callback` (debe coincidir con `PUBLIC_URL` en `.env`).
-4. Copia el **Application ID** a `EB_APPLICATION_ID` en `.env` y reinicia: `docker compose up -d`.
-5. Modo restringido (gratis): vincula tus propias cuentas desde el panel.
+## Enable Banking setup (once)
 
-## Roles de cuenta
+1. Go to https://enablebanking.com/cp/applications and create an application.
+2. Upload `secrets/eb_certificate.pem`; the private key `secrets/eb_private_key.pem` never leaves your Mac.
+3. Redirect URL: `http://localhost:3000/api/banks/callback` (must match `PUBLIC_URL` in `.env`).
+4. Copy the **Application ID** into `EB_APPLICATION_ID` in `.env` and restart: `docker compose up -d`.
+5. Restricted mode (free): link your own accounts from the dashboard.
 
-`día a día` (nómina y pagos), `ahorro`, `no cuenta`. Las transferencias entre tus cuentas (detectadas por IBAN)
-no cuentan como gasto ni ingreso. Se puede marcar a mano cualquier movimiento con ⇄.
+## Account roles
 
-## Seguridad
+`main` (day to day: salary and payments), `savings`, `excluded` (does not count). Transfers between your own accounts
+(detected by IBAN) count as neither expense nor income. Any transaction can be marked by hand with ⇄.
 
-La API y la base de datos no se publican; la BD está en una red interna que la web no ve. Sesión con cookie
-`HttpOnly`; límite de 5 intentos de login por IP; `secrets/` y `.env` fuera de git.
+## Security
 
-## Desarrollo con OpenSpec
+Neither the API nor the database is published; the database sits on an internal network the web app cannot see.
+Session via `HttpOnly` cookie; at most 5 login attempts per IP; `secrets/` and `.env` are kept out of git.
 
-Cambios planificados con [OpenSpec](https://github.com/Fission-AI/OpenSpec) (`openspec/`), con los comandos
-`/opsx:explore`, `/opsx:propose`, `/opsx:update`, `/opsx:apply`, `/opsx:sync` y `/opsx:archive` de Claude Code.
+## Language
+
+Code, specs and documentation are written in English. The app's user-facing copy is Spanish (Spain).
+
+## Development with OpenSpec
+
+Changes are planned with [OpenSpec](https://github.com/Fission-AI/OpenSpec) (`openspec/`), using the Claude Code
+commands `/opsx:explore`, `/opsx:propose`, `/opsx:update`, `/opsx:apply`, `/opsx:sync` and `/opsx:archive`. Current
+behavior is specified under `openspec/specs/`, grouped by bounded context.
