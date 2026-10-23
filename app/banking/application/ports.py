@@ -3,12 +3,22 @@
 from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import date, datetime
+from decimal import Decimal
 from types import TracebackType
 from typing import Any, Protocol, Self
 
-from app.banking.domain.account import Account
+from app.banking.domain.account import Account, AccountRole
 from app.banking.domain.connection import BankConnection, PendingAuthorization
 from app.shared.ids import AccountId
+
+
+@dataclass(frozen=True)
+class AccountSnapshot:
+    """Banking's published read model: what other contexts may know about an own account."""
+
+    account_id: AccountId
+    role: AccountRole
+    balance: Decimal | None
 
 
 @dataclass(frozen=True)

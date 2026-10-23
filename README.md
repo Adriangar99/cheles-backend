@@ -20,9 +20,9 @@ Both repos share the Compose project name `cheles`, so `api`, `db` and `web` sho
 
 ## Architecture
 
-DDD with a hexagonal architecture per bounded context, migrated incrementally. `identity`, `categorization`,
-`transactions` and `banking` are migrated (identity is the reference); stats still lives in the legacy modules
-`app/main.py` (stats and rules routes, startup) and `app/stats.py`.
+DDD with a hexagonal architecture per bounded context: `identity` (the reference), `categorization`, `transactions`,
+`banking` and `stats`. `app/main.py` is only the composition edge: app creation, startup (catalog seeding, scheduled
+sync), `/api/health` and `POST /api/rules`, a flow orchestrated across categorization and transactions.
 
     app/identity/
       domain/           # entities, value objects and rules; plain Python, no frameworks
@@ -36,7 +36,7 @@ DDD with a hexagonal architecture per bounded context, migrated incrementally. `
 - Domain entities are dataclasses; ORM rows live in `infrastructure/orm.py` and repositories translate between them.
 - FastAPI routes depend on placeholder providers that `bootstrap.wire(app, container)` overrides, so tests can wire
   their own `Container` (e.g. with a fake clock or the fake Enable Banking provider).
-- Contexts never import each other's internals nor legacy code. When a context needs data it does not own (own IBANs,
+- Contexts never import each other's internals. When a context needs data it does not own (own IBANs,
   account names, category suggestions, where to store synced transactions) it declares a port, and the composition
   root plugs in an adapter over the owner's public API.
 - Cross-context flows that must answer the caller are orchestrated explicitly at the edge (e.g. `POST /api/rules`
@@ -45,12 +45,14 @@ DDD with a hexagonal architecture per bounded context, migrated incrementally. `
   publish after their unit of work commits, handlers run synchronously in their own transaction, and a failing
   handler is logged without undoing the publisher's change. Subscriptions are wired in `bootstrap.Container`
   (today: `AccountIbanChanged` → transactions reprocess).
-- Legacy modules that need a context outside an HTTP request (startup seeding, scheduled sync, stats) get its
-  services from `bootstrap.current()`. This service locator is transitional and disappears with the stats migration.
+- Stats owns no tables: it reads the read models other contexts publish (transactions' movement records, banking's
+  account snapshots, categorization's labels) through its own ports and aggregates them in its pure domain. A
+  stats-owned projection could replace those adapters without touching the domain.
+- `wire()` keeps the container in `app.state.container`, which only the composition edge (`app/main.py`) reads.
 - `uv run lint-imports` enforces the rules (see `[tool.importlinter]` in `pyproject.toml`): layers only depend
-  downwards, domain and application import no frameworks, a context never imports legacy modules, and both legacy
-  code and other contexts reach a context only through its `public.py`. The one transitional exception is stats
-  reading the banking and transactions tables directly, until stats is migrated.
+  downwards, domain and application import no frameworks, and both the composition edge and other contexts reach a
+  context only through its `public.py` (the composition root `app/bootstrap.py` is the only module that wires
+  internals).
 
 ## Development
 

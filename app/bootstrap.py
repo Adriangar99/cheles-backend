@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.banking.application.ports import BankingProvider, BankingSettings
 from app.banking.application.use_cases import (
     AccountDisplayNames,
+    AccountSnapshots,
     BankingServices,
     CompleteAuthorization,
     ListAvailableBanks,
@@ -60,10 +61,16 @@ from app.identity.infrastructure.security import (
 )
 from app.shared.events import InMemoryEventBus
 from app.shared.ids import AccountId, CategoryId
+from app.stats.application.use_cases import MonthlyHistory, MonthlySummary, StatsServices
+from app.stats.domain.figures import AccountStanding, Movement, SpendingLabel
+from app.stats.infrastructure.clock import SystemClock as StatsClock
+from app.stats.infrastructure.http import router as stats_router
+from app.stats.infrastructure.http import stats_services
 from app.transactions.application.use_cases import (
     EditTransaction,
     Ingest,
     LatestBookedDate,
+    ListMovements,
     ListTransactions,
     ReprocessAll,
     TransactionsServices,
@@ -135,6 +142,7 @@ class Container:
         return TransactionsServices(
             ingest=Ingest(uow=uow, own_accounts=own_accounts, suggestions=suggestions),
             latest_booked_date=LatestBookedDate(uow=uow),
+            list_movements=ListMovements(uow=uow),
             reprocess_all=reprocess_all,
             list_transactions=ListTransactions(uow=uow, own_accounts=own_accounts),
             edit_transaction=EditTransaction(
@@ -175,7 +183,62 @@ class Container:
             update_account=UpdateAccount(uow=uow, events=self.events),
             own_account_ibans=OwnAccountIbans(uow=uow),
             account_display_names=AccountDisplayNames(uow=uow),
+            account_snapshots=AccountSnapshots(uow=uow),
         )
+
+    def stats(self) -> StatsServices:
+        movements, accounts = _TransactionsMovements(self), _BankingStandings(self)
+        return StatsServices(
+            monthly_summary=MonthlySummary(
+                movements=movements, accounts=accounts, labels=_CategorizationLabels(self), clock=StatsClock()
+            ),
+            monthly_history=MonthlyHistory(movements=movements, accounts=accounts),
+        )
+
+
+class _TransactionsMovements:
+    """Stats' `MovementsSource`, served by transactions' published movement records."""
+
+    def __init__(self, container: Container) -> None:
+        self.container = container
+
+    def between(self, start: date | None, end: date | None) -> list[Movement]:
+        return [
+            Movement(r.account_id, r.booking_date, r.amount, r.kind, r.category_id)
+            for r in self.container.transactions().list_movements(start, end)
+        ]
+
+
+class _BankingStandings:
+    """Stats' `AccountsSource`: banking's account snapshots translated into what stats cares about."""
+
+    def __init__(self, container: Container) -> None:
+        self.container = container
+
+    def standings(self) -> list[AccountStanding]:
+        return [
+            AccountStanding(
+                account_id=s.account_id,
+                counts=s.role != "excluded",
+                is_savings=s.role == "savings",
+                balance_group=s.role,
+                balance=s.balance,
+            )
+            for s in self.container.banking().account_snapshots()
+        ]
+
+
+class _CategorizationLabels:
+    """Stats' `CategoryLabelsSource`, served by categorization."""
+
+    def __init__(self, container: Container) -> None:
+        self.container = container
+
+    def labels(self, category_ids: Collection[CategoryId]) -> dict[CategoryId, SpendingLabel]:
+        return {
+            category_id: SpendingLabel(label.name, label.icon, label.color)
+            for category_id, label in self.container.categorization().category_labels(category_ids).items()
+        }
 
 
 class _UrlSafeStates:
@@ -229,30 +292,19 @@ class _CategorizationCatalog:
         return self.container.categorization().category_exists(category_id)
 
 
-_current: Container | None = None
-
-
 def wire(app: FastAPI, container: Container) -> None:
-    """Points the app's dependencies at `container`; call again to swap it (e.g. one per test)."""
-    global _current
-    _current = container
+    """Points the app's dependencies at `container` and keeps it in `app.state.container` for the composition edge
+    (startup and scheduled jobs in app.main); call again to swap it (e.g. one per test)."""
+    app.state.container = container
     app.dependency_overrides[identity_services] = container.identity
     app.dependency_overrides[categorization_services] = container.categorization
     app.dependency_overrides[transactions_services] = container.transactions
     app.dependency_overrides[banking_services] = container.banking
+    app.dependency_overrides[stats_services] = container.stats
     if not getattr(app.state, "context_routers_included", False):
-        app.include_router(identity_router)
-        app.include_router(categorization_router)
-        app.include_router(transactions_router)
-        app.include_router(banking_router)
+        for router in (identity_router, categorization_router, transactions_router, banking_router, stats_router):
+            app.include_router(router)
         app.state.context_routers_included = True
-
-
-def current() -> Container:
-    """Transitional service locator for legacy modules that are not yet bounded contexts; contexts never use it."""
-    if _current is None:
-        raise RuntimeError("No container wired: call app.bootstrap.wire(app, container) first")
-    return _current
 
 
 def create_user(username: str, container: Container | None = None) -> None:
