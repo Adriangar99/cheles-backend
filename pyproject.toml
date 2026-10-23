@@ -75,31 +75,53 @@ root_package = "app"
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
-name = "Identity layers depend only downwards"
+name = "Context layers depend only downwards"
 type = "layers"
-layers = [
-    "app.identity.public",
-    "app.identity.infrastructure",
-    "app.identity.application",
-    "app.identity.domain",
-]
+containers = ["app.identity", "app.categorization"]
+layers = ["public", "infrastructure", "application", "domain"]
 
 [[tool.importlinter.contracts]]
-name = "Identity domain and application are framework-free"
+name = "Context domain and application layers are framework-free"
 type = "forbidden"
-source_modules = ["app.identity.domain", "app.identity.application"]
+source_modules = [
+    "app.identity.domain",
+    "app.identity.application",
+    "app.categorization.domain",
+    "app.categorization.application",
+]
 forbidden_modules = ["fastapi", "starlette", "pydantic", "sqlalchemy", "httpx", "argon2", "pyotp", "qrcode", "alembic"]
 
 [[tool.importlinter.contracts]]
-name = "Identity does not depend on legacy modules"
+name = "Contexts do not depend on legacy modules"
 type = "forbidden"
-source_modules = ["app.identity"]
+source_modules = ["app.identity", "app.categorization"]
 forbidden_modules = ["app.main", "app.cli", "app.models", "app.sync", "app.stats", "app.categorize", "app.enablebanking"]
 
 [[tool.importlinter.contracts]]
-# app.bootstrap is the composition root and may wire identity internals
-name = "Legacy modules use identity only through its public API"
+# app.bootstrap is the composition root and may wire context internals
+name = "Legacy modules use contexts only through their public API"
 type = "forbidden"
 source_modules = ["app.main", "app.cli", "app.models", "app.sync", "app.stats", "app.categorize", "app.enablebanking"]
+forbidden_modules = [
+    "app.identity.domain",
+    "app.identity.application",
+    "app.identity.infrastructure",
+    "app.categorization.domain",
+    "app.categorization.application",
+    "app.categorization.infrastructure",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Categorization uses identity only through its public API"
+type = "forbidden"
+source_modules = ["app.categorization"]
 forbidden_modules = ["app.identity.domain", "app.identity.application", "app.identity.infrastructure"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Identity uses categorization only through its public API"
+type = "forbidden"
+source_modules = ["app.identity"]
+forbidden_modules = ["app.categorization.domain", "app.categorization.application", "app.categorization.infrastructure"]
 allow_indirect_imports = true
