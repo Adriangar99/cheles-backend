@@ -24,6 +24,7 @@ from app.models import (
     PendingAuth,
     Transaction,
 )
+from app.shared.ids import CategoryId
 from app.sync import normalize_iban, reprocess_all, sync_all, sync_connection
 
 log = logging.getLogger("cheles")
@@ -293,7 +294,7 @@ def patch_transaction(
     if not tx:
         raise HTTPException(404)
     if body.category_id is not None:
-        if not current().categorization().category_exists(body.category_id):
+        if not current().categorization().category_exists(CategoryId(body.category_id)):
             raise HTTPException(400, "Categoría inexistente")
         tx.category_id = body.category_id
         tx.category_manual = True
@@ -320,7 +321,7 @@ def create_rule(
 ) -> dict[str, Any]:
     """Creates a high-priority rule, then reprocesses so it applies to the whole history."""
     try:
-        current().categorization().create_rule(body.pattern, body.category_id)
+        current().categorization().create_rule(body.pattern, CategoryId(body.category_id))
     except UnknownCategory:
         raise HTTPException(400, "Categoría inexistente") from None
     return {"processed": reprocess_all(db)}

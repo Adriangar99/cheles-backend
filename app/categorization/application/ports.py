@@ -6,6 +6,7 @@ from typing import Protocol, Self
 
 from app.categorization.domain.category import Category
 from app.categorization.domain.rule import Rule
+from app.shared.ids import CategoryId
 
 
 class CategoryRepository(Protocol):
@@ -17,9 +18,9 @@ class CategoryRepository(Protocol):
 
     def all(self) -> list[Category]: ...
 
-    def by_ids(self, ids: Collection[int]) -> list[Category]: ...
+    def by_ids(self, ids: Collection[CategoryId]) -> list[Category]: ...
 
-    def exists(self, category_id: int) -> bool: ...
+    def exists(self, category_id: CategoryId) -> bool: ...
 
     def add(self, category: Category) -> None:
         """Stores the category and sets its `id`."""

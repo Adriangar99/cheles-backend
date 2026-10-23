@@ -8,10 +8,13 @@ from sqlalchemy.orm import Session
 from app.categorization.domain.category import Category, CategoryKind
 from app.categorization.domain.rule import Rule
 from app.categorization.infrastructure.orm import CategoryRow, RuleRow
+from app.shared.ids import CategoryId
 
 
 def _category(row: CategoryRow) -> Category:
-    return Category(id=row.id, name=row.name, kind=cast(CategoryKind, row.kind), icon=row.icon, color=row.color)
+    return Category(
+        id=CategoryId(row.id), name=row.name, kind=cast(CategoryKind, row.kind), icon=row.icon, color=row.color
+    )
 
 
 class SqlCategoryRepository:
@@ -29,17 +32,17 @@ class SqlCategoryRepository:
     def all(self) -> list[Category]:
         return [_category(row) for row in self.db.scalars(select(CategoryRow))]
 
-    def by_ids(self, ids: Collection[int]) -> list[Category]:
+    def by_ids(self, ids: Collection[CategoryId]) -> list[Category]:
         return [_category(row) for row in self.db.scalars(select(CategoryRow).where(CategoryRow.id.in_(ids)))]
 
-    def exists(self, category_id: int) -> bool:
+    def exists(self, category_id: CategoryId) -> bool:
         return self.db.get(CategoryRow, category_id) is not None
 
     def add(self, category: Category) -> None:
         row = CategoryRow(name=category.name, kind=category.kind, icon=category.icon, color=category.color)
         self.db.add(row)
         self.db.flush()
-        category.id = row.id
+        category.id = CategoryId(row.id)
 
 
 class SqlRuleRepository:
@@ -48,7 +51,9 @@ class SqlRuleRepository:
 
     def all(self) -> list[Rule]:
         rows = self.db.scalars(select(RuleRow).order_by(RuleRow.priority, RuleRow.id))
-        return [Rule(id=r.id, pattern=r.pattern, category_id=r.category_id, priority=r.priority) for r in rows]
+        return [
+            Rule(id=r.id, pattern=r.pattern, category_id=CategoryId(r.category_id), priority=r.priority) for r in rows
+        ]
 
     def add(self, rule: Rule) -> None:
         row = RuleRow(pattern=rule.pattern, category_id=rule.category_id, priority=rule.priority)

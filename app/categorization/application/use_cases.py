@@ -7,6 +7,7 @@ from app.categorization.domain.category import Category, CategoryLabel
 from app.categorization.domain.errors import UnknownCategory
 from app.categorization.domain.policy import CategorizationPolicy
 from app.categorization.domain.rule import DEFAULT_RULE_PRIORITY, USER_RULE_PRIORITY, Rule
+from app.shared.ids import CategoryId
 
 
 @dataclass
@@ -41,7 +42,7 @@ class ListCategories:
 class CreateRule:
     uow: UnitOfWork
 
-    def __call__(self, pattern: str, category_id: int) -> Rule:
+    def __call__(self, pattern: str, category_id: CategoryId) -> Rule:
         with self.uow:
             if not self.uow.categories.exists(category_id):
                 raise UnknownCategory()
@@ -55,7 +56,7 @@ class CreateRule:
 class CategoryExists:
     uow: UnitOfWork
 
-    def __call__(self, category_id: int) -> bool:
+    def __call__(self, category_id: CategoryId) -> bool:
         with self.uow:
             return self.uow.categories.exists(category_id)
 
@@ -75,7 +76,7 @@ class LoadPolicy:
 class CategoryLabels:
     uow: UnitOfWork
 
-    def __call__(self, ids: Collection[int]) -> dict[int, CategoryLabel]:
+    def __call__(self, ids: Collection[CategoryId]) -> dict[CategoryId, CategoryLabel]:
         with self.uow:
             return {
                 c.id: CategoryLabel(id=c.id, name=c.name, icon=c.icon, color=c.color)

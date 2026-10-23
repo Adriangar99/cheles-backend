@@ -6,7 +6,7 @@ for `YearMonth`. Commit before any mutation check.
 ## 1. Shared kernel
 
 - [x] 1.1 Write failing unit tests for `YearMonth` (parses `2026-10`, rejects `2026-9` and `09-2026`, bounds of October and of December → next January), then add `app/shared/{money,year_month,ids}.py` and a contract that keeps `app.shared` free of other `app` modules and frameworks; verify the tests and `lint-imports` pass
-- [ ] 1.2 Switch categorization's public signatures to `CategoryId`; verify mypy and the categorization tests pass
+- [x] 1.2 Switch categorization's public signatures to `CategoryId`; verify mypy and the categorization tests pass
 
 ## 2. Transactions domain and application
 

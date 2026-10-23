@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Literal
 
+from app.shared.ids import CategoryId
+
 CategoryKind = Literal["expense", "income"]
 
 
@@ -12,14 +14,14 @@ class Category:
     kind: CategoryKind
     icon: str
     color: str
-    id: int | None = None
+    id: CategoryId | None = None
 
 
 @dataclass(frozen=True)
 class CategoryLabel:
     """How other contexts show a category."""
 
-    id: int
+    id: CategoryId
     name: str
     icon: str
     color: str

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from app.categorization.domain.catalog import BIZUM_INCOME, OTHER_EXPENSE, OTHER_INCOME
 from app.categorization.domain.category import Category
 from app.categorization.domain.rule import Rule
+from app.shared.ids import CategoryId
 
 
 @dataclass(frozen=True)
@@ -11,9 +12,9 @@ class CategorizationPolicy:
     """Picks a category for a movement: the first matching rule, or a fallback category."""
 
     rules: Sequence[Rule]
-    fallback_expense: int | None
-    fallback_income: int | None
-    bizum_income: int | None
+    fallback_expense: CategoryId | None
+    fallback_income: CategoryId | None
+    bizum_income: CategoryId | None
 
     @classmethod
     def from_catalog(cls, categories: Sequence[Category], rules: Sequence[Rule]) -> "CategorizationPolicy":
@@ -26,7 +27,7 @@ class CategorizationPolicy:
             bizum_income=by_name.get(BIZUM_INCOME),
         )
 
-    def categorize(self, counterparty: str | None, description: str, is_income: bool) -> int | None:
+    def categorize(self, counterparty: str | None, description: str, is_income: bool) -> CategoryId | None:
         # Padded with spaces so patterns like "bar " can require a word boundary
         text = f" {counterparty or ''} {description} ".lower()
         for rule in self.rules:
