@@ -15,7 +15,7 @@ first, failing until the contract file exists.
 
 ## 3. Verification
 
-- [ ] 3.1 Run `docker compose up -d --build`; verify the API starts, a login with wrong credentials still returns 401 «Datos incorrectos» through the web app, and CI passes on the pull request
+- [x] 3.1 Run `docker compose up -d --build`; verify the API starts, a login with wrong credentials still returns 401 «Datos incorrectos» through the web app, and CI passes on the pull request
 
 ## Workflow follow-up
 
