@@ -33,6 +33,9 @@ jobs:
       - name: Type check
         run: uv run mypy
 
+      - name: Architecture contracts
+        run: uv run lint-imports
+
       # testcontainers starts Postgres with the runner's Docker
       - name: Tests
         run: uv run pytest --cov

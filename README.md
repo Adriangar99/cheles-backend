@@ -26,6 +26,7 @@ Requires [uv](https://docs.astral.sh/uv/) and Docker (the tests start a throwawa
     uv run pytest --cov                  # tests + coverage (fails below the ratchet in pyproject.toml)
     uv run ruff check . && uv run ruff format --check .
     uv run mypy                          # strict, over app/, migrations/ and tests/
+    uv run lint-imports                  # architecture contracts (pyproject.toml, [tool.importlinter])
 
 CI (GitHub Actions) runs the same checks on every pull request and on `main`.
 
