@@ -1,4 +1,4 @@
-# Mantiene el nombre de proyecto "cheles" para reutilizar el volumen db-data existente
+# Project name "cheles": reuses the existing db-data volume and is shared with cheles-frontend
 name: cheles
 
 services:
@@ -7,7 +7,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: cheles
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?define DB_PASSWORD en .env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
       POSTGRES_DB: cheles
     volumes:
       - db-data:/var/lib/postgresql/data
@@ -19,6 +19,7 @@ services:
 
   api:
     build: .
+    image: cheles-api
     restart: unless-stopped
     depends_on:
       db:
@@ -32,7 +33,7 @@ services:
       TZ: Europe/Madrid
     secrets:
       - eb_private_key
-    # Sin puertos publicados: solo la web (repo cheles-frontend) llega a la API, por la red "cheles"
+    # No published ports: only the web app (cheles-frontend repo) reaches the API, over cheles-net
     networks:
       internal:
       web:
@@ -46,8 +47,8 @@ volumes:
   db-data:
 
 networks:
-  # La base de datos no es visible desde la web
+  # The database is not visible from the web app
   internal:
-  # Red compartida con cheles-frontend; la crea este compose
+  # Network shared with cheles-frontend; created by this compose file
   web:
     name: cheles-net

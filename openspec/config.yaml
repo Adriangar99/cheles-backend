@@ -1,34 +1,54 @@
 schema: spec-driven
 
 context: |
-  Cheles: web personal para ver las cuentas bancarias del propio usuario (BBVA, Revolut…)
-  vía Enable Banking. Un único usuario, solo accesible desde su Mac.
-  Este repo es solo el backend: FastAPI + Postgres, Docker Compose. El frontend está en el repo cheles-frontend; la API solo se comparte con él por la red Docker `cheles-net`.
-  Escribe todos los artefactos (proposal, specs, design, tasks) en español.
-  Restricciones que no se deducen del código:
-  - Seguridad: la web solo en 127.0.0.1, la API nunca se publica, sesión con cookie
-    HttpOnly, login con contraseña + TOTP y límite de intentos por IP.
-  - Nunca versionar ni mostrar `.env` ni `secrets/` (claves privadas de Enable Banking).
-  - Los movimientos se guardan tal cual los da el banco (`raw`) para poder reprocesarlos
-    sin volver a pedirlos; los cambios de categorización/estadísticas deben partir de `raw`.
-  - Las transferencias entre cuentas propias (detectadas por IBAN) no cuentan como gasto
-    ni ingreso. Roles de cuenta: día a día, ahorro, no cuenta.
+  Cheles: personal web app to view the user's own bank accounts (BBVA, Revolut…) through
+  Enable Banking. Single user, only reachable from their Mac.
+  This repo is the backend only: FastAPI + Postgres, Docker Compose. The frontend lives in the
+  cheles-frontend repo; the API is only shared with it over the Docker network `cheles-net`.
+
+  Language:
+  - Write every artifact (proposal, specs, design, tasks), all documentation and all code
+    (identifiers, comments, docstrings, commit messages) in English.
+  - The app's user-facing copy is Spanish (Spain). Quote current user-facing literals verbatim.
+
+  Constraints that cannot be inferred from the code:
+  - Security: the web app only listens on 127.0.0.1, the API is never published, session via
+    HttpOnly cookie, login with password + TOTP and a per-IP attempt limit.
+  - Never commit or print `.env` or `secrets/` (Enable Banking private keys).
+  - Transactions are stored exactly as the bank returns them (`raw`) so they can be reprocessed
+    without fetching again; categorization/stats changes must derive from `raw`.
+  - Transfers between the user's own accounts (detected by IBAN) count as neither expense nor
+    income. Account roles: main (day to day), savings, excluded.
+
+  Architecture (DDD + hexagonal, incremental migration in progress):
+  - Bounded contexts: identity, banking, transactions, categorization, stats. Each one has
+    domain/ (pure: no FastAPI, SQLAlchemy or httpx), application/ (use cases and ports) and
+    infrastructure/ (adapters: FastAPI HTTP, SQLAlchemy repos, Enable Banking, scheduler).
+  - Minimal shared kernel: IDs, Money (no sign semantics), YearMonth and integration events.
+    A value object only goes into the kernel if it means the same in every context; otherwise
+    each context owns its own (e.g. Iban in banking vs CounterpartyIban in transactions).
+  - Contexts only talk through domain events on a synchronous in-memory bus, or through another
+    context's public application/ API. Never import another context's internals (enforced by
+    import-linter).
+  - Translation of the Enable Banking format (from `raw`) lives in transactions (its own ACL);
+    banking only fetches and publishes raw transactions.
+  - TDD: domain and use cases tested with in-memory repos; adapters against real Postgres
+    (testcontainers); schema managed with Alembic migrations.
+  - Tooling: uv + pyproject, ruff, mypy strict, pytest + coverage, import-linter.
 
 rules:
   proposal:
-    - Indicar siempre qué queda fuera de alcance
-    - Señalar si el cambio afecta a la superficie de seguridad (auth, exposición de puertos, secretos)
+    - Always state what is out of scope
+    - Flag whether the change touches the security surface (auth, port exposure, secrets)
+    - State which bounded context(s) the change affects
+    - State which cross-context events are added or changed
+  specs:
+    - One capability per business concept, under its bounded context (e.g. banking/bank-sync)
+    - Verifiable WHEN/THEN scenarios that translate directly into tests
+  design:
+    - Place every new entity, value object, port and adapter in its layer and bounded context
+    - Justify why each value object lives in its context or in the shared kernel, based on its meaning
+    - State whether an Alembic migration is needed
   tasks:
-    - Incluir una tarea de verificación con `docker compose up -d --build`
-
-# Per-operation guidance (optional)
-# Add advisory guidance for how apply and archive work should be conducted.
-# This is separate from artifact rules above.
-# Example:
-#   operations:
-#     apply:
-#       guidance:
-#         - Keep test summaries concise
-#     archive:
-#       guidance:
-#         - Summarize the archive outcome before finishing
+    - "Follow TDD: every behavior task starts by writing the failing test"
+    - Include a verification task with `docker compose up -d --build`
