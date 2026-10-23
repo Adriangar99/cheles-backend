@@ -4,13 +4,14 @@ import os
 import subprocess
 import sys
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import make_url
+from testcontainers.community.postgres import PostgresContainer
 
 import app.models  # noqa: F401  (registers every table on Base.metadata)
 from app.db import Base
@@ -68,16 +69,39 @@ def test_database_url_provided(tmp_path: Path) -> None:
 
 
 @pytest.fixture
-def scratch_database_url() -> Iterator[str]:
-    """A brand-new empty database in the test Postgres, dropped afterwards."""
-    name = f"scratch_{uuid.uuid4().hex[:12]}"
+def new_database() -> Iterator[Callable[[], str]]:
+    """Factory of brand-new empty databases in the test Postgres, all dropped afterwards."""
     admin = create_engine(os.environ["DATABASE_URL"], isolation_level="AUTOCOMMIT")
+    names: list[str] = []
+
+    def create() -> str:
+        name = f"scratch_{uuid.uuid4().hex[:12]}"
+        with admin.connect() as connection:
+            connection.execute(text(f'CREATE DATABASE "{name}"'))
+        names.append(name)
+        return make_url(os.environ["DATABASE_URL"]).set(database=name).render_as_string(hide_password=False)
+
+    yield create
     with admin.connect() as connection:
-        connection.execute(text(f'CREATE DATABASE "{name}"'))
-    yield make_url(os.environ["DATABASE_URL"]).set(database=name).render_as_string(hide_password=False)
-    with admin.connect() as connection:
-        connection.execute(text(f'DROP DATABASE "{name}" WITH (FORCE)'))
+        for name in names:
+            connection.execute(text(f'DROP DATABASE "{name}" WITH (FORCE)'))
     admin.dispose()
+
+
+@pytest.fixture
+def scratch_database_url(new_database: Callable[[], str]) -> str:
+    return new_database()
+
+
+def schema_dump(postgres: PostgresContainer, database_url: str) -> str:
+    """pg_dump --schema-only run inside the container, without the migration table and per-dump tokens."""
+    database = make_url(database_url).database
+    exit_code, output = postgres.get_wrapped_container().exec_run(
+        ["pg_dump", "-U", postgres.username, "--schema-only", "--no-owner", "-T", "alembic_version", str(database)]
+    )
+    assert exit_code == 0, output
+    lines = output.decode().splitlines()
+    return "\n".join(line for line in lines if line and not line.startswith(("--", "\\restrict", "\\unrestrict")))
 
 
 def run_migrate(database_url: str, tmp_path: Path) -> subprocess.CompletedProcess[str]:
@@ -148,6 +172,18 @@ def test_existing_database_created_before_migrations(scratch_database_url: str, 
         assert connection.execute(text("SELECT username FROM users")).scalars().all() == ["ana"]
         assert connection.execute(text("SELECT name FROM categories")).scalars().all() == ["Mascotas"]
     engine.dispose()
+
+
+def test_schema_equivalence(postgres: PostgresContainer, new_database: Callable[[], str], tmp_path: Path) -> None:
+    """Scenario: Schema equivalence"""
+    migrated, created = new_database(), new_database()
+    run_migrate(migrated, tmp_path)
+    engine = create_engine(created)
+    Base.metadata.create_all(engine)
+    engine.dispose()
+
+    assert schema_dump(postgres, migrated) == schema_dump(postgres, created)
+    assert "CREATE TABLE public.transactions" in schema_dump(postgres, migrated)
 
 
 def test_health_check(client: TestClient) -> None:
