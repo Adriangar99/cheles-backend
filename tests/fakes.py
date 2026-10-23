@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any
 
-from app.enablebanking import EnableBankingError
+from app.banking.domain.errors import ProviderError
 
 
 @dataclass
@@ -52,7 +52,7 @@ class FakeEnableBanking:
         error: Exception | None = None,
     ) -> None:
         """Makes every later call to `method` (for one account uid, if given) raise an Enable Banking error."""
-        self._errors[f"{method}:{uid}" if uid else method] = error or EnableBankingError(status_code, body)
+        self._errors[f"{method}:{uid}" if uid else method] = error or ProviderError(status_code, body)
 
     def recover(self) -> None:
         self._errors.clear()
@@ -90,7 +90,7 @@ class FakeEnableBanking:
     def create_session(self, code: str) -> dict[str, Any]:
         self._record("create_session", code)
         if code not in self.sessions:
-            raise EnableBankingError(422, {"message": "invalid code"})
+            raise ProviderError(422, {"message": "invalid code"})
         return self.sessions[code]
 
     def delete_session(self, session_id: str) -> None:

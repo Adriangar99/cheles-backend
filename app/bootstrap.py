@@ -3,12 +3,34 @@
 This is the only module outside a bounded context allowed to import the contexts' internals.
 """
 
-from collections.abc import Callable
+import secrets
+from collections.abc import Callable, Collection
 from dataclasses import dataclass, field
+from datetime import date
+from typing import Any
 
 from fastapi import FastAPI
 from sqlalchemy.orm import Session
 
+from app.banking.application.ports import BankingProvider, BankingSettings
+from app.banking.application.use_cases import (
+    AccountDisplayNames,
+    BankingServices,
+    CompleteAuthorization,
+    ListAvailableBanks,
+    ListConnections,
+    OwnAccountIbans,
+    StartAuthorization,
+    SyncAll,
+    SyncConnection,
+    UpdateAccount,
+)
+from app.banking.domain.events import AccountIbanChanged
+from app.banking.infrastructure.clock import SystemClock as BankingClock
+from app.banking.infrastructure.enable_banking import EnableBankingClient
+from app.banking.infrastructure.http import banking_services
+from app.banking.infrastructure.http import router as banking_router
+from app.banking.infrastructure.repositories import SqlUnitOfWork as BankingUnitOfWork
 from app.categorization.application.use_cases import (
     CategorizationServices,
     CategoryExists,
@@ -36,8 +58,8 @@ from app.identity.infrastructure.security import (
     SecretsTokenGenerator,
     SystemClock,
 )
-from app.legacy_bridge import LegacyOwnAccounts
-from app.shared.ids import CategoryId
+from app.shared.events import InMemoryEventBus
+from app.shared.ids import AccountId, CategoryId
 from app.transactions.application.use_cases import (
     EditTransaction,
     Ingest,
@@ -63,6 +85,15 @@ class Container:
     clock: Clock = field(default_factory=SystemClock)
     tokens: TokenGenerator = field(default_factory=SecretsTokenGenerator)
     login_throttle: LoginThrottle = field(default_factory=LoginThrottle)
+    banking_provider: BankingProvider = field(default_factory=EnableBankingClient)
+    events: InMemoryEventBus = field(default_factory=InMemoryEventBus)
+
+    def __post_init__(self) -> None:
+        # A new or removed own IBAN changes which movements are transfers between own accounts
+        self.events.subscribe(AccountIbanChanged, self._reprocess_transactions)
+
+    def _reprocess_transactions(self, _: AccountIbanChanged) -> None:
+        self.transactions().reprocess_all()
 
     @classmethod
     def from_environment(cls) -> "Container":
@@ -98,7 +129,7 @@ class Container:
 
     def transactions(self) -> TransactionsServices:
         uow = TransactionsUnitOfWork(self.session_factory)
-        own_accounts = LegacyOwnAccounts(self.session_factory)
+        own_accounts = _BankingOwnAccounts(self)
         suggestions = _CategorizationSuggestions(self)
         reprocess_all = ReprocessAll(uow=uow, own_accounts=own_accounts, suggestions=suggestions)
         return TransactionsServices(
@@ -113,6 +144,69 @@ class Container:
                 reprocess_all=reprocess_all,
             ),
         )
+
+    def banking(self) -> BankingServices:
+        uow = BankingUnitOfWork(self.session_factory)
+        settings = BankingSettings(
+            country=self.settings.eb_country,
+            consent_days=self.settings.eb_consent_days,
+            redirect_url=self.settings.eb_redirect_url,
+            initial_history_days=self.settings.initial_history_days,
+        )
+        clock = BankingClock()
+        sync_connection = SyncConnection(
+            uow=uow,
+            provider=self.banking_provider,
+            transactions=_TransactionsGateway(self),
+            settings=settings,
+            clock=clock,
+        )
+        return BankingServices(
+            list_connections=ListConnections(uow=uow),
+            list_available_banks=ListAvailableBanks(provider=self.banking_provider, settings=settings),
+            start_authorization=StartAuthorization(
+                uow=uow, provider=self.banking_provider, settings=settings, clock=clock, states=_UrlSafeStates()
+            ),
+            complete_authorization=CompleteAuthorization(
+                uow=uow, provider=self.banking_provider, sync_connection=sync_connection
+            ),
+            sync_connection=sync_connection,
+            sync_all=SyncAll(uow=uow, sync_connection=sync_connection),
+            update_account=UpdateAccount(uow=uow, events=self.events),
+            own_account_ibans=OwnAccountIbans(uow=uow),
+            account_display_names=AccountDisplayNames(uow=uow),
+        )
+
+
+class _UrlSafeStates:
+    def new_state(self) -> str:
+        return secrets.token_urlsafe(24)
+
+
+class _BankingOwnAccounts:
+    """Transactions' `OwnAccounts` port, served by banking."""
+
+    def __init__(self, container: Container) -> None:
+        self.container = container
+
+    def ibans(self) -> set[str]:
+        return self.container.banking().own_account_ibans()
+
+    def display_names(self, account_ids: Collection[AccountId]) -> dict[AccountId, str]:
+        return self.container.banking().account_display_names(account_ids)
+
+
+class _TransactionsGateway:
+    """Banking's `TransactionsGateway` port, served by transactions."""
+
+    def __init__(self, container: Container) -> None:
+        self.container = container
+
+    def latest_booked_date(self, account_id: AccountId) -> date | None:
+        return self.container.transactions().latest_booked_date(account_id)
+
+    def ingest(self, account_id: AccountId, raws: list[dict[str, Any]]) -> int:
+        return self.container.transactions().ingest(account_id, raws)
 
 
 class _CategorizationSuggestions:
@@ -145,10 +239,12 @@ def wire(app: FastAPI, container: Container) -> None:
     app.dependency_overrides[identity_services] = container.identity
     app.dependency_overrides[categorization_services] = container.categorization
     app.dependency_overrides[transactions_services] = container.transactions
+    app.dependency_overrides[banking_services] = container.banking
     if not getattr(app.state, "context_routers_included", False):
         app.include_router(identity_router)
         app.include_router(categorization_router)
         app.include_router(transactions_router)
+        app.include_router(banking_router)
         app.state.context_routers_included = True
 
 

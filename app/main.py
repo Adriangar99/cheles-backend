@@ -1,41 +1,31 @@
 import logging
-import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import UTC, date, datetime, timedelta
-from typing import Any, Literal
+from datetime import date
+from typing import Any
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from fastapi import Depends, FastAPI, HTTPException, Query, Response
+from fastapi import Depends, FastAPI, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
 from app import stats
 from app.bootstrap import Container, current, wire
 from app.categorization.public import UnknownCategory
 from app.config import get_settings
-from app.db import SessionLocal, get_db
-from app.enablebanking import EnableBankingClient, EnableBankingError
+from app.db import get_db
 from app.identity.public import AuthenticatedUser, require_user
-from app.models import (
-    Account,
-    BankConnection,
-    PendingAuth,
-)
 from app.shared.ids import CategoryId
-from app.sync import normalize_iban, sync_all, sync_connection
 
 log = logging.getLogger("cheles")
 settings = get_settings()
 
 
 def scheduled_sync() -> None:
-    with SessionLocal() as db:
-        try:
-            log.info("Sincronización programada: %s movimientos nuevos", sync_all(db, current().transactions()))
-        except Exception:
-            log.exception("Falló la sincronización programada")
+    try:
+        log.info("Sincronización programada: %s movimientos nuevos", current().banking().sync_all())
+    except Exception:
+        log.exception("Falló la sincronización programada")
 
 
 @asynccontextmanager
@@ -52,179 +42,7 @@ app = FastAPI(title="Cheles", lifespan=lifespan, docs_url=None, redoc_url=None, 
 wire(app, Container.from_environment())
 
 
-# ---------- Bancos ----------
-
-
-def serialize_account(a: Account) -> dict[str, Any]:
-    return {
-        "id": a.id,
-        "name": a.alias or a.name,
-        "iban_tail": a.iban[-4:] if a.iban else None,
-        "currency": a.currency,
-        "role": a.role,
-        "balance": a.balance,
-        "balance_at": a.balance_at,
-        "connection_id": a.connection_id,
-    }
-
-
-def serialize_connection(c: BankConnection) -> dict[str, Any]:
-    return {
-        "id": c.id,
-        "bank": c.aspsp_name,
-        "status": c.status,
-        "valid_until": c.valid_until,
-        "last_synced_at": c.last_synced_at,
-        "last_error": c.last_error,
-        "accounts": [serialize_account(a) for a in c.accounts],
-    }
-
-
-@app.get("/api/banks", response_model=None)
-def list_banks(db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_user)) -> dict[str, Any]:
-    connections = (
-        db.scalars(select(BankConnection).options(joinedload(BankConnection.accounts)).order_by(BankConnection.id))
-        .unique()
-        .all()
-    )
-    orphans = db.scalars(select(Account).where(Account.connection_id.is_(None))).all()
-    return {
-        "connections": [serialize_connection(c) for c in connections],
-        "detached_accounts": [serialize_account(a) for a in orphans],
-    }
-
-
-@app.get("/api/banks/available", response_model=None)
-def available_banks(_: AuthenticatedUser = Depends(require_user)) -> list[dict[str, Any]]:
-    try:
-        aspsps = EnableBankingClient().list_aspsps(settings.eb_country)
-    except EnableBankingError as e:
-        raise HTTPException(502, f"Enable Banking: {e.body}") from e
-    return [{"name": a["name"], "country": a["country"], "logo": a.get("logo")} for a in aspsps]
-
-
-class ConnectBody(BaseModel):
-    name: str
-    country: str = settings.eb_country
-
-
-@app.post("/api/banks/connect", response_model=None)
-def connect_bank(
-    body: ConnectBody, db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_user)
-) -> dict[str, Any]:
-    state = secrets.token_urlsafe(24)
-    db.add(PendingAuth(state=state, aspsp_name=body.name, aspsp_country=body.country))
-    db.commit()
-    valid_until = datetime.now(UTC) + timedelta(days=settings.eb_consent_days)
-    try:
-        url = EnableBankingClient().start_auth(body.name, body.country, state, settings.eb_redirect_url, valid_until)
-    except EnableBankingError as e:
-        raise HTTPException(502, f"Enable Banking: {e.body}") from e
-    return {"url": url}
-
-
-@app.get("/api/banks/callback", response_model=None)
-def bank_callback(
-    code: str | None = None,
-    state: str | None = None,
-    error: str | None = None,
-    db: Session = Depends(get_db),
-    _: AuthenticatedUser = Depends(require_user),
-) -> Response:
-    def redirect(query: str) -> Response:
-        return Response(status_code=303, headers={"Location": f"/bancos?{query}"})
-
-    pending = db.get(PendingAuth, state) if state else None
-    if error or not code or not pending:
-        return redirect("error=1")
-
-    try:
-        session = EnableBankingClient().create_session(code)
-    except EnableBankingError as e:
-        log.warning("Error creando sesión: %s", e)
-        return redirect("error=1")
-
-    connection = BankConnection(
-        aspsp_name=pending.aspsp_name,
-        aspsp_country=pending.aspsp_country,
-        session_id=session["session_id"],
-        valid_until=datetime.fromisoformat(session["access"]["valid_until"]),
-    )
-    db.add(connection)
-    db.flush()
-
-    for acc in session["accounts"]:
-        ident = acc.get("identification_hash")
-        iban = normalize_iban((acc.get("account_id") or {}).get("iban"))
-        # Si es una cuenta ya conocida (reconexión) la reenganchamos y conservamos su rol y alias
-        account = db.scalar(select(Account).where(Account.identification_hash == ident)) if ident else None
-        if account is None and iban:
-            account = db.scalar(select(Account).where(Account.iban == iban))
-        if account is None:
-            account = Account(
-                identification_hash=ident,
-                name=acc.get("name") or pending.aspsp_name,
-                currency=acc.get("currency") or "EUR",
-            )
-            db.add(account)
-        account.connection_id = connection.id
-        account.eb_uid = acc["uid"]
-        account.iban = iban or account.iban
-        account.identification_hash = ident or account.identification_hash
-
-    db.delete(pending)
-    db.commit()
-    try:
-        sync_connection(db, connection, current().transactions())
-    except Exception:
-        log.exception("Falló la primera sincronización")
-    return redirect("connected=1")
-
-
-@app.post("/api/banks/{connection_id}/sync", response_model=None)
-def sync_one(
-    connection_id: int, db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_user)
-) -> dict[str, Any]:
-    connection = db.get(BankConnection, connection_id)
-    if not connection:
-        raise HTTPException(404)
-    new = sync_connection(db, connection, current().transactions())
-    return {"new": new, "status": connection.status, "error": connection.last_error}
-
-
-@app.post("/api/sync", response_model=None)
-def sync_everything(db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_user)) -> dict[str, Any]:
-    return {"new": sync_all(db, current().transactions())}
-
-
-class AccountPatch(BaseModel):
-    role: Literal["main", "savings", "excluded"] | None = None
-    alias: str | None = None
-    iban: str | None = None
-
-
-@app.patch("/api/accounts/{account_id}", response_model=None)
-def patch_account(
-    account_id: int, body: AccountPatch, db: Session = Depends(get_db), _: AuthenticatedUser = Depends(require_user)
-) -> dict[str, Any]:
-    account = db.get(Account, account_id)
-    if not account:
-        raise HTTPException(404)
-    changed_iban = False
-    if body.role is not None:
-        account.role = body.role
-    if body.alias is not None:
-        account.alias = body.alias or None
-    if body.iban is not None:
-        account.iban = normalize_iban(body.iban) or None
-        changed_iban = True
-    db.commit()
-    if changed_iban:
-        current().transactions().reprocess_all()
-    return serialize_account(account)
-
-
-# ---------- Movimientos y categorías ----------
+# ---------- Rules (orchestrated across categorization and transactions) ----------
 
 
 class RuleBody(BaseModel):
@@ -242,7 +60,7 @@ def create_rule(body: RuleBody, _: AuthenticatedUser = Depends(require_user)) ->
     return {"processed": current().transactions().reprocess_all()}
 
 
-# ---------- Estadísticas ----------
+# ---------- Stats ----------
 
 
 @app.get("/api/stats/summary", response_model=None)

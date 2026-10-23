@@ -15,8 +15,8 @@ for the event bus and the reconnection matching. Commit before any mutation chec
 ## 3. Infrastructure, composition and legacy removal
 
 - [x] 3.1 Move `PendingAuth`/`BankConnection`/`Account` to banking ORM rows, add the repositories, move the Enable Banking client to `app/banking/infrastructure/enable_banking.py` raising `ProviderError`, and register the rows in `migrations/env.py`; verify `alembic check` on a migrated scratch database reports no changes
-- [ ] 3.2 Add the banking router, the `Container`/`wire()` wiring (provider field, event bus and the `AccountIbanChanged` subscription, transactions ↔ banking adapters, scheduled sync), extend the stats exception, and delete `app/models.py`, `app/sync.py`, `app/enablebanking.py`, `app/legacy_bridge.py` and the bank/account routes in `app/main.py`
-- [ ] 3.3 Adapt the characterization tests (ORM imports, fake provider through the container, pagination test, scheduled-sync stub) without changing expected values; verify the whole suite, ruff, mypy and `lint-imports` pass, and `git diff tests/` shows no changed expected values
+- [x] 3.2 Add the banking router, the `Container`/`wire()` wiring (provider field, event bus and the `AccountIbanChanged` subscription, transactions ↔ banking adapters, scheduled sync), extend the stats exception, and delete `app/models.py`, `app/sync.py`, `app/enablebanking.py`, `app/legacy_bridge.py` and the bank/account routes in `app/main.py`
+- [x] 3.3 Adapt the characterization tests (ORM imports, fake provider through the container, pagination test, scheduled-sync stub) without changing expected values; verify the whole suite, ruff, mypy and `lint-imports` pass, and `git diff tests/` shows no changed expected values
 
 ## 4. Documentation and verification
 

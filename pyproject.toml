@@ -123,11 +123,7 @@ source_modules = [
 forbidden_modules = [
     "app.main",
     "app.cli",
-    "app.models",
-    "app.sync",
     "app.stats",
-    "app.enablebanking",
-    "app.legacy_bridge",
 ]
 
 [[tool.importlinter.contracts]]
@@ -137,11 +133,7 @@ type = "forbidden"
 source_modules = [
     "app.main",
     "app.cli",
-    "app.models",
-    "app.sync",
     "app.stats",
-    "app.enablebanking",
-    "app.legacy_bridge",
 ]
 forbidden_modules = [
     "app.identity.domain",
@@ -160,6 +152,7 @@ forbidden_modules = [
 allow_indirect_imports = true
 # Transitional, read-only: stats aggregates other contexts' tables until stats becomes its own read model
 ignore_imports = [
+    "app.stats -> app.banking.infrastructure.orm",
     "app.stats -> app.transactions.infrastructure.orm",
 ]
 
@@ -243,11 +236,7 @@ forbidden_modules = [
     "app.bootstrap",
     "app.main",
     "app.cli",
-    "app.models",
-    "app.sync",
     "app.stats",
-    "app.enablebanking",
-    "app.legacy_bridge",
     "fastapi",
     "starlette",
     "pydantic",

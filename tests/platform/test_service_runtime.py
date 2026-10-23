@@ -12,8 +12,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import make_url
 
-import app.models  # noqa: F401  (registers every table on Base.metadata)
-from app.db import Base
+from app import orm_registry
 from tests.helpers import ROOT
 
 APP_TABLES = {
@@ -119,7 +118,7 @@ def test_database_already_up_to_date(scratch_database_url: str, tmp_path: Path) 
 def test_existing_database_created_before_migrations(scratch_database_url: str, tmp_path: Path) -> None:
     """Scenario: Existing database created before migrations"""
     engine = create_engine(scratch_database_url)
-    Base.metadata.create_all(engine)
+    orm_registry.metadata.create_all(engine)
     with engine.begin() as connection:
         connection.execute(text("INSERT INTO users (username, password_hash, totp_secret) VALUES ('ana', 'h', 's')"))
         connection.execute(
