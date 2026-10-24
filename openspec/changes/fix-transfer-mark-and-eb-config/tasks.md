@@ -14,7 +14,7 @@ TDD: write or flip the scenario test first, see it fail, then implement. Commit 
 
 ## 3. Verification
 
-- [ ] 3.1 Run ruff, mypy, import-linter and the full pytest suite with coverage (≥ 97); check the spec-coverage meta-test; rebuild the API image and verify `migrate` applies `0002` on the real database without data loss, and that `/api/banks/available` answers 503 with the readable detail on a throwaway stack without `EB_APPLICATION_ID`; open the PR and verify CI
+- [x] 3.1 Run ruff, mypy, import-linter and the full pytest suite with coverage (≥ 97); check the spec-coverage meta-test; rebuild the API image and verify `migrate` applies `0002` on the real database without data loss, and that `/api/banks/available` answers 503 with the readable detail on a throwaway stack without `EB_APPLICATION_ID`; open the PR and verify CI
 
 ## Workflow follow-up
 
