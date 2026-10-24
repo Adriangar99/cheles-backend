@@ -115,6 +115,7 @@ class EditTransaction:
     uow: UnitOfWork
     own_accounts: OwnAccounts
     catalog: CategoryCatalog
+    suggestions: CategorySuggestions
     reprocess_all: ReprocessAll
 
     def __call__(self, transaction_id: TransactionId, edit: TransactionEdit) -> TransactionView:
@@ -130,7 +131,7 @@ class EditTransaction:
             if edit.clear_category:
                 transaction.category_manual = False
             if edit.kind is not None:
-                transaction.kind = edit.kind
+                transaction.set_kind(edit.kind, self.own_accounts.ibans(), self.suggestions.load())
             if edit.note is not None:
                 transaction.note = edit.note or None
             self.uow.transactions.save(transaction)

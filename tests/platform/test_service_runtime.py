@@ -8,11 +8,11 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from alembic.script import ScriptDirectory
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import make_url
 
-from app import orm_registry
 from tests.helpers import ROOT
 
 APP_TABLES = {
@@ -65,6 +65,23 @@ def scratch_database_url() -> Iterator[str]:
     admin.dispose()
 
 
+HEAD = ScriptDirectory(str(ROOT / "migrations")).get_current_head()
+
+
+def create_pre_migration_schema(database_url: str, tmp_path: Path) -> None:
+    """The schema the old create_all startup built: exactly the baseline revision, with no version recorded."""
+    result = run_python(
+        "from alembic import command; from app.migrate import BASELINE, _config; command.upgrade(_config(), BASELINE)",
+        tmp_path,
+        env={"DATABASE_URL": database_url},
+    )
+    assert result.returncode == 0, result.stderr
+    engine = create_engine(database_url)
+    with engine.begin() as connection:
+        connection.execute(text("DROP TABLE alembic_version"))
+    engine.dispose()
+
+
 def run_migrate(database_url: str, tmp_path: Path) -> subprocess.CompletedProcess[str]:
     result = run_python(
         "import runpy, sys; sys.argv = ['app.cli', 'migrate']; runpy.run_module('app.cli', run_name='__main__')",
@@ -95,7 +112,7 @@ def test_empty_database(scratch_database_url: str, tmp_path: Path) -> None:
     run_migrate(scratch_database_url, tmp_path)
 
     assert table_names(scratch_database_url) == APP_TABLES | {"alembic_version"}
-    assert schema_version(scratch_database_url) == "0001_baseline"
+    assert schema_version(scratch_database_url) == HEAD
 
 
 def test_database_already_up_to_date(scratch_database_url: str, tmp_path: Path) -> None:
@@ -112,13 +129,13 @@ def test_database_already_up_to_date(scratch_database_url: str, tmp_path: Path) 
     with engine.connect() as connection:
         assert connection.execute(text("SELECT name FROM categories")).scalars().all() == ["Mascotas"]
     engine.dispose()
-    assert schema_version(scratch_database_url) == "0001_baseline"
+    assert schema_version(scratch_database_url) == HEAD
 
 
 def test_existing_database_created_before_migrations(scratch_database_url: str, tmp_path: Path) -> None:
     """Scenario: Existing database created before migrations"""
+    create_pre_migration_schema(scratch_database_url, tmp_path)
     engine = create_engine(scratch_database_url)
-    orm_registry.metadata.create_all(engine)
     with engine.begin() as connection:
         connection.execute(text("INSERT INTO users (username, password_hash, totp_secret) VALUES ('ana', 'h', 's')"))
         connection.execute(
@@ -128,7 +145,7 @@ def test_existing_database_created_before_migrations(scratch_database_url: str, 
     result = run_migrate(scratch_database_url, tmp_path)
 
     assert "baseline" in (result.stdout + result.stderr).lower()
-    assert schema_version(scratch_database_url) == "0001_baseline"
+    assert schema_version(scratch_database_url) == HEAD
     with engine.connect() as connection:
         assert connection.execute(text("SELECT username FROM users")).scalars().all() == ["ana"]
         assert connection.execute(text("SELECT name FROM categories")).scalars().all() == ["Mascotas"]
@@ -149,7 +166,7 @@ def test_create_user_migrates_an_empty_database(scratch_database_url: str, tmp_p
     )
 
     assert result.returncode == 0, result.stderr
-    assert schema_version(scratch_database_url) == "0001_baseline"
+    assert schema_version(scratch_database_url) == HEAD
     engine = create_engine(scratch_database_url)
     with engine.connect() as connection:
         assert connection.execute(text("SELECT username FROM users")).scalars().all() == ["ana"]

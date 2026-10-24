@@ -149,6 +149,7 @@ class Container:
                 uow=uow,
                 own_accounts=own_accounts,
                 catalog=_CategorizationCatalog(self),
+                suggestions=suggestions,
                 reprocess_all=reprocess_all,
             ),
         )

@@ -7,7 +7,7 @@ from typing import Any
 import httpx
 import jwt
 
-from app.banking.domain.errors import ProviderError
+from app.banking.domain.errors import ProviderError, ProviderNotConfigured
 from app.config import get_settings
 
 
@@ -26,9 +26,12 @@ class EnableBankingClient:
         if self._token and now < self._token_exp - 300:
             return self._token
         if not self.application_id:
-            raise RuntimeError("EB_APPLICATION_ID is not configured")
-        with open(self.private_key_path, "rb") as f:
-            private_key = f.read()
+            raise ProviderNotConfigured("EB_APPLICATION_ID is not configured")
+        try:
+            with open(self.private_key_path, "rb") as f:
+                private_key = f.read()
+        except OSError as e:
+            raise ProviderNotConfigured(f"Cannot read the private key: {e}") from e
         self._token_exp = now + 3600
         self._token = jwt.encode(
             {"iss": "enablebanking.com", "aud": "api.enablebanking.com", "iat": now, "exp": self._token_exp},

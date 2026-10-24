@@ -118,6 +118,17 @@ def test_note(client: TestClient, db: Session) -> None:
     assert by_reference(db, "groceries").note == "compra semanal"
 
 
+@pytest.mark.usefixtures("stored")
+def test_manual_kind(client: TestClient, db: Session) -> None:
+    """Scenario: Manual kind"""
+    client.patch(f"/api/transactions/{by_reference(db, 'groceries').id}", json={"kind": "transfer"})
+
+    client.post("/api/reprocess")
+
+    groceries = by_reference(db, "groceries")
+    assert (groceries.kind, groceries.kind_manual) == ("transfer", True)
+
+
 # ---------- Actions that trigger a reprocess ----------
 
 

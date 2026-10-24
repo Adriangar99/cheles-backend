@@ -30,6 +30,7 @@ class Transaction:
     description: str
     raw: dict[str, Any] = field(repr=False)
     kind: Kind = "normal"
+    kind_manual: bool = False  # set by hand (⇄); sync and reprocessing keep it
     category_id: CategoryId | None = None
     category_manual: bool = False
     note: str | None = None
@@ -64,12 +65,22 @@ class Transaction:
         self.description = data.description
 
     def derive(self, own_ibans: Collection[str], suggester: CategorySuggester) -> None:
-        """Fields computed from the bank data. The kind is always recomputed (known defect: the manual ⇄ mark is
-        lost); a manual category is kept."""
-        self.kind = "transfer" if self.counterparty_iban and self.counterparty_iban in own_ibans else "normal"
+        """Fields computed from the bank data; a manual kind and a manual category are kept."""
+        if not self.kind_manual:
+            self.kind = self._automatic_kind(own_ibans)
         if not self.category_manual:
             self.category_id = (
                 None
                 if self.kind == "transfer"
                 else suggester.categorize(self.counterparty, self.description, is_income=self.amount.amount > 0)
             )
+
+    def set_kind(self, kind: Kind, own_ibans: Collection[str], suggester: CategorySuggester) -> None:
+        """Sets the kind by hand (⇄). It is only stored as manual when it differs from the automatic one, so asking
+        for the automatic kind removes the manual mark."""
+        self.kind_manual = kind != self._automatic_kind(own_ibans)
+        self.kind = kind
+        self.derive(own_ibans, suggester)
+
+    def _automatic_kind(self, own_ibans: Collection[str]) -> Kind:
+        return "transfer" if self.counterparty_iban and self.counterparty_iban in own_ibans else "normal"

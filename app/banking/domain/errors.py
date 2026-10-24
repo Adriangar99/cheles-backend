@@ -16,3 +16,7 @@ class ConnectionNotFound(Exception):
 
 class AccountNotFound(Exception):
     pass
+
+
+class ProviderNotConfigured(Exception):
+    """The bank data provider cannot be used: its application id or private key is missing."""

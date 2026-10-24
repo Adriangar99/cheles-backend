@@ -33,6 +33,7 @@ def ingest(client: TestClient, db: Session, fake_bank: FakeEnableBanking) -> Any
             [FakeAccount(uid="main", iban=OWN_MAIN), FakeAccount(uid="savings", iban=OWN_SAVINGS)],
             code=f"code-{next(codes)}",
         )
+        db.expire_all()  # rows changed through the API since the last read
         return list(db.scalars(select(Transaction).order_by(Transaction.id)))
 
     return run
@@ -199,3 +200,14 @@ def test_excluded_account(ingest: Any, client: TestClient, db: Session) -> None:
     [transaction] = ingest(raw_tx("50.00", reference="r1", creditor_iban=OWN_SAVINGS))
 
     assert transaction.kind == "transfer"
+
+
+def test_manual_kind_kept_on_ingestion(ingest: Any, client: TestClient) -> None:
+    """Scenario: Manual kind kept on ingestion"""
+    payment = raw_tx("50.00", reference="r1", creditor_iban=OWN_SAVINGS)
+    [transaction] = ingest(payment)
+    client.patch(f"/api/transactions/{transaction.id}", json={"kind": "normal"})
+
+    [again] = ingest(payment)
+
+    assert (again.kind, again.kind_manual) == ("normal", True)
