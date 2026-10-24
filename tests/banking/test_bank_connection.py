@@ -280,6 +280,19 @@ def test_syncing_without_configuration(
 
 
 @pytest.mark.usefixtures("user")
+def test_syncing_everything_without_configuration(
+    client: TestClient, fake_bank: FakeEnableBanking, container: Container
+) -> None:
+    """Scenario: Syncing everything without configuration"""
+    connect_bank(client, fake_bank, [FakeAccount(uid="u1")])
+    use_unconfigured_provider(container)
+
+    response = client.post("/api/sync")
+
+    assert (response.status_code, response.json()) == (503, NOT_CONFIGURED)
+
+
+@pytest.mark.usefixtures("user")
 def test_callback_without_configuration(client: TestClient, container: Container) -> None:
     """Scenario: Callback without configuration"""
     state = start_authorization(client)

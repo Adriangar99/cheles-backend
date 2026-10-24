@@ -15,7 +15,7 @@ from app.banking.application.ports import (
 )
 from app.banking.domain.account import Account, AccountRole
 from app.banking.domain.connection import BankConnection, ConnectionStatus, PendingAuthorization
-from app.banking.domain.errors import AccountNotFound, ConnectionNotFound, ProviderError
+from app.banking.domain.errors import AccountNotFound, ConnectionNotFound, ProviderError, ProviderNotConfigured
 from app.banking.domain.events import AccountIbanChanged
 from app.banking.domain.reconnection import IncomingAccount, link_account
 from app.banking.domain.sync_policy import pick_balance, window_start
@@ -170,7 +170,7 @@ class CompleteAuthorization:
                 return False
             try:
                 session = self.provider.create_session(code)
-            except ProviderError as e:
+            except (ProviderError, ProviderNotConfigured) as e:
                 log.warning("Error creando sesión: %s", e)
                 return False
 

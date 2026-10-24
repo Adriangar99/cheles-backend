@@ -19,7 +19,8 @@ Two defects recorded while specifying the backend:
   automatic kind). Sync and reprocessing keep a manual kind. The automatic category follows the resulting kind: none for
   a transfer, the suggested one for a normal transaction, unless the category is manual.
 - `kind_manual` is exposed with every transaction, next to `category_manual`.
-- **Missing provider configuration**: listing banks, starting an authorization and syncing a connection answer **503**
+- **Missing provider configuration**: listing banks, starting an authorization and syncing (one or every connection)
+  answer **503**
   with detail «Enable Banking no está configurado» when the application id is missing or the private key cannot be
   read; the authorization callback redirects to `/bancos?error=1`. Scheduled syncs keep logging the failure.
 - Database migration adding the `kind_manual` column (false for existing rows).

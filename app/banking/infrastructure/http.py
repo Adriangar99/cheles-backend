@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from app.banking.application.use_cases import BankingServices, ConnectionView
 from app.banking.domain.account import Account
-from app.banking.domain.errors import AccountNotFound, ConnectionNotFound, ProviderError
+from app.banking.domain.errors import AccountNotFound, ConnectionNotFound, ProviderError, ProviderNotConfigured
 from app.config import get_settings
 from app.http_types import JsonDateTime, JsonDecimal
 from app.identity.public import AuthenticatedUser, require_user
@@ -95,6 +95,10 @@ def _provider_failure(error: ProviderError) -> HTTPException:
     return HTTPException(502, f"Enable Banking: {error.body}")
 
 
+def _not_configured() -> HTTPException:
+    return HTTPException(503, "Enable Banking no está configurado")
+
+
 router = APIRouter()
 
 
@@ -117,6 +121,8 @@ def available_banks(
         return services.list_available_banks()
     except ProviderError as e:
         raise _provider_failure(e) from e
+    except ProviderNotConfigured:
+        raise _not_configured() from None
 
 
 class ConnectBody(BaseModel):
@@ -134,6 +140,8 @@ def connect_bank(
         return {"url": services.start_authorization(body.name, body.country)}
     except ProviderError as e:
         raise _provider_failure(e) from e
+    except ProviderNotConfigured:
+        raise _not_configured() from None
 
 
 @router.get("/api/banks/callback", response_model=None)
@@ -158,6 +166,8 @@ def sync_one(
         result = services.sync_connection(connection_id)
     except ConnectionNotFound:
         raise HTTPException(404) from None
+    except ProviderNotConfigured:
+        raise _not_configured() from None
     return {"new": result.new, "status": result.status, "error": result.error}
 
 
@@ -165,7 +175,10 @@ def sync_one(
 def sync_everything(
     services: BankingServices = Depends(banking_services), _: AuthenticatedUser = Depends(require_user)
 ) -> dict[str, Any]:
-    return {"new": services.sync_all()}
+    try:
+        return {"new": services.sync_all()}
+    except ProviderNotConfigured:
+        raise _not_configured() from None
 
 
 class AccountPatch(BaseModel):

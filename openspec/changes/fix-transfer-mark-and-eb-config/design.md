@@ -48,7 +48,7 @@ request model is unchanged (`kind` already exists).
 - `EnableBankingClient._jwt()` raises it when the application id is empty or the key file cannot be read (`OSError`).
   It is raised before any request, so nothing has been ingested when it propagates and the sync's unit of work is
   rolled back.
-- HTTP: available banks, connect and sync map it to `HTTPException(503, "Enable Banking no está configurado")`.
+- HTTP: available banks, connect, sync one and sync all map it to `HTTPException(503, "Enable Banking no está configurado")`.
 - Callback: `CompleteAuthorization` treats it like a `ProviderError` (returns false → `/bancos?error=1`).
 - Scheduled sync: unchanged; the generic handler in `app/main.py` already logs it.
 
