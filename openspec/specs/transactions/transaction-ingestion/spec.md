@@ -83,7 +83,8 @@ The system SHALL identify each transaction within its account with `ref:<entry_r
 
 ### Requirement: Detecting transfers between own accounts
 The system SHALL mark a transaction as `transfer` when its counterparty IBAN matches the IBAN of any registered own
-account (whatever its role), and as `normal` otherwise. Transfers get no automatic category.
+account (whatever its role), and as `normal` otherwise, unless its kind was set by hand. Transfers get no automatic
+category.
 
 #### Scenario: Transfer to the savings account
 - **WHEN** a debit's counterparty IBAN is another own account
@@ -96,3 +97,7 @@ account (whatever its role), and as `normal` otherwise. Transfers get no automat
 #### Scenario: Excluded account
 - **WHEN** the counterparty IBAN belongs to an own account with role `excluded`
 - **THEN** the transaction is also `transfer`
+
+#### Scenario: Manual kind kept on ingestion
+- **WHEN** a transaction manually marked `normal` whose counterparty is an own account is received again
+- **THEN** it stays `normal` and keeps `kind_manual` true
