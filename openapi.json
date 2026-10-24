@@ -634,6 +634,10 @@
             "title": "Kind",
             "type": "string"
           },
+          "kind_manual": {
+            "title": "Kind Manual",
+            "type": "boolean"
+          },
           "note": {
             "anyOf": [
               {
@@ -659,6 +663,7 @@
           "counterparty",
           "description",
           "kind",
+          "kind_manual",
           "category_id",
           "category_manual",
           "account_id",

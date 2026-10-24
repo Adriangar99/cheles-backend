@@ -26,6 +26,7 @@ def _entity(row: TransactionRow) -> Transaction:
         description=row.description,
         raw=row.raw,
         kind=cast(Kind, row.kind),
+        kind_manual=row.kind_manual,
         category_id=CategoryId(row.category_id) if row.category_id is not None else None,
         category_manual=row.category_manual,
         note=row.note,
@@ -44,6 +45,7 @@ def _copy_to_row(transaction: Transaction, row: TransactionRow) -> None:
     row.description = transaction.description
     row.raw = transaction.raw
     row.kind = transaction.kind
+    row.kind_manual = transaction.kind_manual
     row.category_id = transaction.category_id
     row.category_manual = transaction.category_manual
     row.note = transaction.note

@@ -33,6 +33,7 @@ def ingest(client: TestClient, db: Session, fake_bank: FakeEnableBanking) -> Any
             [FakeAccount(uid="main", iban=OWN_MAIN), FakeAccount(uid="savings", iban=OWN_SAVINGS)],
             code=f"code-{next(codes)}",
         )
+        db.expire_all()  # rows changed through the API since the last read
         return list(db.scalars(select(Transaction).order_by(Transaction.id)))
 
     return run

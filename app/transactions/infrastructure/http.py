@@ -31,6 +31,7 @@ def _serialize(view: TransactionView) -> dict[str, Any]:
         "counterparty": t.counterparty,
         "description": t.description,
         "kind": t.kind,
+        "kind_manual": t.kind_manual,
         "category_id": t.category_id,
         "category_manual": t.category_manual,
         "account_id": t.account_id,
@@ -48,6 +49,7 @@ class TransactionOut(BaseModel):
     counterparty: str | None
     description: str
     kind: Literal["normal", "transfer"]
+    kind_manual: bool
     category_id: int | None
     category_manual: bool
     account_id: int

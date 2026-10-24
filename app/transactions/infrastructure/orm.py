@@ -4,7 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, Date, DateTime, ForeignKey, Numeric, String, UniqueConstraint, func
+from sqlalchemy import JSON, Boolean, Date, DateTime, ForeignKey, Numeric, String, UniqueConstraint, false, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -25,6 +25,7 @@ class TransactionRow(Base):
     counterparty_iban: Mapped[str | None] = mapped_column(String(34))
     description: Mapped[str] = mapped_column(String(1024), default="")
     kind: Mapped[str] = mapped_column(String(16), default="normal")  # normal | transfer (between own accounts)
+    kind_manual: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id", ondelete="SET NULL"))
     category_manual: Mapped[bool] = mapped_column(Boolean, default=False)
     note: Mapped[str | None] = mapped_column(String(512))
