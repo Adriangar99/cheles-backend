@@ -4,7 +4,7 @@ TDD: write or flip the scenario test first, see it fail, then implement. Commit 
 
 ## 1. Manual kind
 
-- [ ] 1.1 Flip the two known-defect tests to «The mark survives a reprocess» / «The mark survives a sync» and add tests for «Remove a manual transfer mark», «Mark a detected transfer as normal», «Automatic kind», «Manual kind» (reprocessing) and «Manual kind kept on ingestion»; verify they fail for the right reason
+- [x] 1.1 Flip the two known-defect tests to «The mark survives a reprocess» / «The mark survives a sync» and add tests for «Remove a manual transfer mark», «Mark a detected transfer as normal», «Automatic kind», «Manual kind» (reprocessing) and «Manual kind kept on ingestion»; verify they fail for the right reason
 - [ ] 1.2 Add `kind_manual` to `Transaction` (`derive` respects it, new `set_kind`), the ORM row and repository mapping, Alembic `0002_kind_manual`, `EditTransaction` using `set_kind` with `CategorySuggestions` wired in `bootstrap.py`, and `kind_manual` in `TransactionOut`; regenerate `openapi.json`; verify the transactions tests, the migration tests and the API contract test pass, and mutation-check `set_kind`/`derive`
 
 ## 2. Provider not configured

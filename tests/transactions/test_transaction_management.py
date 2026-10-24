@@ -110,12 +110,19 @@ def test_listed_transaction(client: TestClient, db: Session) -> None:
         "counterparty": "MERCADONA",
         "description": "",
         "kind": "normal",
+        "kind_manual": False,
         "category_id": category_id(db, "Supermercado"),
         "category_manual": False,
         "account_id": account.id,
         "account": "Nómina",
         "note": None,
     }
+
+
+@pytest.mark.usefixtures("connection_id")
+def test_automatic_kind(client: TestClient) -> None:
+    """Scenario: Automatic kind"""
+    assert {t["kind_manual"] for t in listed(client)} == {False}
 
 
 # ---------- Manual category ----------
@@ -176,7 +183,27 @@ def test_unknown_transaction(client: TestClient) -> None:
     assert client.patch("/api/transactions/999", json={"note": "x"}).status_code == 404
 
 
-# ---------- Manual transfer mark (⇄) ----------
+# ---------- Stored manual kind (⇄) ----------
+
+SAVINGS_IBAN = "ES2222222222222222222222"
+
+
+@pytest.fixture
+def detected_transfer(client: TestClient, db: Session, fake_bank: FakeEnableBanking) -> int:
+    """A payment to the user's own savings account, detected as a transfer by its IBAN."""
+    login(client, db)
+    fake_bank.transactions["main"] = [
+        raw_tx("300.00", reference="to-savings", creditor="MERCADONA", creditor_iban=SAVINGS_IBAN)
+    ]
+    connect_bank(client, fake_bank, [FakeAccount(uid="main"), FakeAccount(uid="savings", iban=SAVINGS_IBAN)])
+    return transaction_id(db, "ref:to-savings")
+
+
+def stored_kind(db: Session, tx_id: int) -> tuple[str, bool, int | None]:
+    db.expire_all()
+    transaction = db.get(Transaction, tx_id)
+    assert transaction is not None
+    return transaction.kind, transaction.kind_manual, transaction.category_id
 
 
 @pytest.mark.usefixtures("connection_id")
@@ -187,35 +214,56 @@ def test_mark_as_transfer(client: TestClient, db: Session) -> None:
 
     response = client.patch(f"/api/transactions/{tx_id}", json={"kind": "transfer"})
 
-    assert response.json()["kind"] == "transfer"
+    body = response.json()
+    assert (body["kind"], body["kind_manual"], body["category_id"]) == ("transfer", True, None)
     after = client.get("/api/stats/summary", params={"month": "2026-10"}).json()["expenses"]
     assert before - after == 40.0
 
 
 @pytest.mark.usefixtures("connection_id")
-def test_the_mark_is_lost_on_reprocess_known_defect(client: TestClient, db: Session) -> None:
-    """Scenario: The mark is lost on reprocess (known defect)"""
+def test_remove_a_manual_transfer_mark(client: TestClient, db: Session) -> None:
+    """Scenario: Remove a manual transfer mark"""
+    tx_id = transaction_id(db, "ref:oct-1")
+    client.patch(f"/api/transactions/{tx_id}", json={"kind": "transfer"})
+
+    response = client.patch(f"/api/transactions/{tx_id}", json={"kind": "normal"})
+
+    body = response.json()
+    assert (body["kind"], body["kind_manual"]) == ("normal", False)
+    assert body["category_id"] == category_id(db, "Supermercado")
+
+
+def test_mark_a_detected_transfer_as_normal(client: TestClient, db: Session, detected_transfer: int) -> None:
+    """Scenario: Mark a detected transfer as normal"""
+    assert stored_kind(db, detected_transfer) == ("transfer", False, None)
+
+    response = client.patch(f"/api/transactions/{detected_transfer}", json={"kind": "normal"})
+
+    body = response.json()
+    assert (body["kind"], body["kind_manual"]) == ("normal", True)
+    assert body["category_id"] == category_id(db, "Supermercado")
+
+
+@pytest.mark.usefixtures("connection_id")
+def test_the_mark_survives_a_reprocess(client: TestClient, db: Session) -> None:
+    """Scenario: The mark survives a reprocess"""
     tx_id = transaction_id(db, "ref:oct-1")
     client.patch(f"/api/transactions/{tx_id}", json={"kind": "transfer"})
 
     client.post("/api/reprocess")
 
-    db.expire_all()
-    transaction = db.get(Transaction, tx_id)
-    assert transaction is not None
-    assert (transaction.kind, transaction.category_id) == ("normal", category_id(db, "Supermercado"))
+    assert stored_kind(db, tx_id) == ("transfer", True, None)
 
 
-def test_the_mark_is_lost_on_sync_known_defect(client: TestClient, db: Session, connection_id: int) -> None:
-    """Scenario: The mark is lost on sync (known defect)"""
+def test_the_mark_survives_a_sync(client: TestClient, db: Session, connection_id: int) -> None:
+    """Scenario: The mark survives a sync"""
     # The latest booked transaction, so it falls inside the next sync's 10-day overlap window
     tx_id = transaction_id(db, "ref:oct-3")
     client.patch(f"/api/transactions/{tx_id}", json={"kind": "transfer"})
 
     client.post(f"/api/banks/{connection_id}/sync")
 
-    db.expire_all()
-    assert db.get(Transaction, tx_id).kind == "normal"  # type: ignore[union-attr]
+    assert stored_kind(db, tx_id) == ("transfer", True, None)
 
 
 # ---------- Transaction note ----------
