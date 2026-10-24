@@ -1,6 +1,7 @@
 """Characterization of `banking/bank-connection`."""
 
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -8,9 +9,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.banking.infrastructure.enable_banking import EnableBankingClient
 from app.banking.infrastructure.orm import AccountRow as Account
 from app.banking.infrastructure.orm import BankConnectionRow as BankConnection
 from app.banking.infrastructure.orm import PendingAuthRow as PendingAuth
+from app.bootstrap import Container
 from app.transactions.infrastructure.orm import TransactionRow as Transaction
 from tests.fakes import FakeAccount, FakeEnableBanking
 from tests.helpers import connect_bank, login, raw_tx
@@ -220,3 +223,68 @@ def test_the_bank_sends_no_iban(client: TestClient, db: Session, fake_bank: Fake
 
     db.expire_all()
     assert db.scalars(select(Account)).one().iban == "ES123456"
+
+
+# ---------- Missing Enable Banking configuration ----------
+
+NOT_CONFIGURED = {"detail": "Enable Banking no está configurado"}
+
+
+def use_unconfigured_provider(container: Container, *, application_id: str = "", key_path: str | None = None) -> None:
+    """The real Enable Banking client, with the configuration the test leaves out."""
+    provider = EnableBankingClient()
+    provider.application_id = application_id
+    if key_path is not None:
+        provider.private_key_path = key_path
+    container.banking_provider = provider
+
+
+@pytest.mark.usefixtures("user")
+def test_listing_banks_without_configuration(client: TestClient, container: Container) -> None:
+    """Scenario: Listing banks without configuration"""
+    use_unconfigured_provider(container)
+
+    response = client.get("/api/banks/available")
+
+    assert (response.status_code, response.json()) == (503, NOT_CONFIGURED)
+
+
+@pytest.mark.usefixtures("user")
+def test_connecting_without_a_private_key(client: TestClient, container: Container, tmp_path: Path) -> None:
+    """Scenario: Connecting without a private key"""
+    use_unconfigured_provider(container, application_id="app-id", key_path=str(tmp_path / "missing.pem"))
+
+    response = client.post("/api/banks/connect", json={"name": "BBVA"})
+
+    assert (response.status_code, response.json()) == (503, NOT_CONFIGURED)
+
+
+@pytest.mark.usefixtures("user")
+def test_syncing_without_configuration(
+    client: TestClient, db: Session, fake_bank: FakeEnableBanking, container: Container
+) -> None:
+    """Scenario: Syncing without configuration"""
+    connection_id = connect_bank(client, fake_bank, [FakeAccount(uid="u1")])
+    before = db.get(BankConnection, connection_id)
+    assert before is not None
+    stored = (before.last_error, before.status, before.last_synced_at)
+    use_unconfigured_provider(container)
+
+    response = client.post(f"/api/banks/{connection_id}/sync")
+
+    assert (response.status_code, response.json()) == (503, NOT_CONFIGURED)
+    db.expire_all()
+    after = db.get(BankConnection, connection_id)
+    assert after is not None
+    assert (after.last_error, after.status, after.last_synced_at) == stored
+
+
+@pytest.mark.usefixtures("user")
+def test_callback_without_configuration(client: TestClient, container: Container) -> None:
+    """Scenario: Callback without configuration"""
+    state = start_authorization(client)
+    use_unconfigured_provider(container)
+
+    response = client.get("/api/banks/callback", params={"code": "auth-code", "state": state})
+
+    assert response.headers["location"] == "/bancos?error=1"
