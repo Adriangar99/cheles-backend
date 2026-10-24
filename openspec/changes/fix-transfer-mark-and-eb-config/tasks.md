@@ -10,7 +10,7 @@ TDD: write or flip the scenario test first, see it fail, then implement. Commit 
 ## 2. Provider not configured
 
 - [x] 2.1 Add tests for the four «Missing Enable Banking configuration» scenarios; verify they fail (500 today)
-- [ ] 2.2 Add `ProviderNotConfigured`, raise it from `EnableBankingClient._jwt()` for a missing application id or unreadable key, map it to 503 in the banking HTTP adapter and to `error=1` in the callback; verify the banking tests pass and mutation-check the mapping
+- [x] 2.2 Add `ProviderNotConfigured`, raise it from `EnableBankingClient._jwt()` for a missing application id or unreadable key, map it to 503 in the banking HTTP adapter and to `error=1` in the callback; verify the banking tests pass and mutation-check the mapping
 
 ## 3. Verification
 
