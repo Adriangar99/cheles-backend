@@ -25,8 +25,7 @@ normalized field (except the external id), the kind (transfer or normal) and the
 - **THEN** transactions whose counterparty has that IBAN become `transfer`
 
 ### Requirement: Reprocessing respects manual edits
-Reprocessing SHALL keep manually assigned categories and notes. The kind is always recomputed (see the known defect in
-`transactions/transaction-management`).
+Reprocessing SHALL keep manually assigned categories, manual kinds and notes.
 
 #### Scenario: Manual category
 - **WHEN** a transaction with a manual category is reprocessed
@@ -35,6 +34,10 @@ Reprocessing SHALL keep manually assigned categories and notes. The kind is alwa
 #### Scenario: Note
 - **WHEN** a transaction with a note is reprocessed
 - **THEN** it keeps its note
+
+#### Scenario: Manual kind
+- **WHEN** a transaction with a manual kind is reprocessed
+- **THEN** it keeps its kind and `kind_manual` stays true
 
 ### Requirement: Actions that trigger a reprocess
 The system SHALL reprocess every transaction after an account's IBAN changes, after a categorization rule is created
