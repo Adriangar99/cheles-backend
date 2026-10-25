@@ -19,7 +19,7 @@ invented (never the owner's export); the real export is only used for a final ma
 
 ## 4. Contract and verification
 
-- [ ] 4.1 `openapi.json` regenerated; docs (features, API); ruff, mypy, import-linter, pytest (coverage ≥ 97 %), CI; preview of the owner's export checked by hand
+- [x] 4.1 `openapi.json` regenerated; docs (features, API); ruff, mypy, import-linter, pytest (coverage ≥ 97 %), CI; preview of the owner's export checked by hand
 
 ## Workflow follow-up
 
