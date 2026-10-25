@@ -9,12 +9,12 @@ class Settings(BaseSettings):
     # Required: no built-in default, so a missing setting fails fast instead of using guessed credentials
     database_url: str
 
-    # URL pública de la web (a donde vuelve el navegador tras autorizar en el banco)
+    # Public URL of the web app (where the browser returns after authorizing at the bank)
     public_url: str = "http://localhost:3000"
 
-    # Sesión de login
+    # Login session
     session_days: int = 14
-    cookie_secure: bool = False  # True en cuanto se sirva por HTTPS
+    cookie_secure: bool = False  # True as soon as it is served over HTTPS
 
     # Enable Banking
     eb_api_url: str = "https://api.enablebanking.com"
@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     eb_country: str = "ES"
     eb_consent_days: int = 180
 
-    # Sincronización automática (horas, separadas por comas, hora local del contenedor)
+    # Automatic sync (comma-separated hours, container local time)
     sync_hours: str = "7,19"
     initial_history_days: int = 730
 
