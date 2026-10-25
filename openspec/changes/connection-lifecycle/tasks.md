@@ -8,7 +8,7 @@ TDD: write the scenario test first and see it fail for the right reason. Commit 
 
 ## 2. Removing a connection
 
-- [ ] 2.1 Tests for «Remove a connection», «Enable Banking fails to close the session», «Unknown connection» and «Reconnecting after removing», then add `RemoveConnection`, `DELETE /api/banks/{id}` and the revoked filter in the listing; verify and mutation-check
+- [x] 2.1 Tests for «Remove a connection», «Enable Banking fails to close the session», «Unknown connection» and «Reconnecting after removing», then add `RemoveConnection`, `DELETE /api/banks/{id}` and the revoked filter in the listing; verify and mutation-check
 
 ## 3. Pending authorizations
 
