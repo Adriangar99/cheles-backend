@@ -98,7 +98,25 @@ class SqlTransactionRepository:
     def latest_booked_date(self, account_id: AccountId) -> date | None:
         return self.db.scalar(
             select(func.max(TransactionRow.booking_date)).where(
-                TransactionRow.account_id == account_id, TransactionRow.status == BOOKED
+                TransactionRow.account_id == account_id,
+                TransactionRow.status == BOOKED,
+                TransactionRow.source == "bank",
+            )
+        )
+
+    def earliest_bank_date(self, account_id: AccountId) -> date | None:
+        return self.db.scalar(
+            select(func.min(TransactionRow.booking_date)).where(
+                TransactionRow.account_id == account_id, TransactionRow.source == "bank"
+            )
+        )
+
+    def imported_ids(self, account_id: AccountId) -> set[str]:
+        return set(
+            self.db.scalars(
+                select(TransactionRow.external_id).where(
+                    TransactionRow.account_id == account_id, TransactionRow.source == "import"
+                )
             )
         )
 

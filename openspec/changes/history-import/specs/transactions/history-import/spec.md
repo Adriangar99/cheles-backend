@@ -100,5 +100,5 @@ saliente» rows; the user marks moves between own accounts as transfers afterwar
 - **THEN** its category is «Supermercado», automatic
 
 #### Scenario: MoneyLover transfer
-- **WHEN** a row of «Transferencia entrante» of +15.00 with note «Bizum Toni cine» is imported
+- **WHEN** a row of «Transferencia entrante» of +15.00 with note «Bizum Toni» is imported
 - **THEN** it is an ordinary income movement whose category is «Bizum recibido», automatic

@@ -18,6 +18,7 @@ from app.banking.application.use_cases import (
     AccountSnapshots,
     BankingServices,
     CompleteAuthorization,
+    CreateAccountWithoutBank,
     ListAvailableBanks,
     ListConnections,
     OwnAccountIbans,
@@ -73,7 +74,9 @@ from app.transactions.application.use_cases import (
     LatestBookedDate,
     ListMovements,
     ListTransactions,
+    PreviewImport,
     ReprocessAll,
+    RunImport,
     TransactionsServices,
 )
 from app.transactions.domain.transaction import CategorySuggester
@@ -139,6 +142,7 @@ class Container:
         uow = TransactionsUnitOfWork(self.session_factory)
         own_accounts = _BankingOwnAccounts(self)
         suggestions = _CategorizationSuggestions(self)
+        import_accounts, category_names = _BankingImportAccounts(self), _CategorizationNames(self)
         reprocess_all = ReprocessAll(uow=uow, own_accounts=own_accounts, suggestions=suggestions)
         return TransactionsServices(
             ingest=Ingest(uow=uow, own_accounts=own_accounts, suggestions=suggestions),
@@ -153,6 +157,8 @@ class Container:
                 suggestions=suggestions,
                 reprocess_all=reprocess_all,
             ),
+            preview_import=PreviewImport(uow=uow, accounts=import_accounts, categories=category_names),
+            run_import=RunImport(uow=uow, accounts=import_accounts, categories=category_names, suggestions=suggestions),
         )
 
     def banking(self) -> BankingServices:
@@ -184,6 +190,7 @@ class Container:
             sync_connection=sync_connection,
             sync_all=SyncAll(uow=uow, sync_connection=sync_connection),
             update_account=UpdateAccount(uow=uow, events=self.events),
+            create_account_without_bank=CreateAccountWithoutBank(uow=uow),
             own_account_ibans=OwnAccountIbans(uow=uow),
             account_display_names=AccountDisplayNames(uow=uow),
             account_snapshots=AccountSnapshots(uow=uow),
@@ -261,6 +268,29 @@ class _BankingOwnAccounts:
 
     def display_names(self, account_ids: Collection[AccountId]) -> dict[AccountId, str]:
         return self.container.banking().account_display_names(account_ids)
+
+
+class _BankingImportAccounts:
+    """Transactions' `ImportAccounts` port, served by banking."""
+
+    def __init__(self, container: Container) -> None:
+        self.container = container
+
+    def display_names(self, account_ids: Collection[AccountId]) -> dict[AccountId, str]:
+        return self.container.banking().account_display_names(account_ids)
+
+    def create_without_bank(self, name: str) -> AccountId:
+        return self.container.banking().create_account_without_bank(name)
+
+
+class _CategorizationNames:
+    """Transactions' `CategoryNames` port, served by categorization."""
+
+    def __init__(self, container: Container) -> None:
+        self.container = container
+
+    def ids_by_name(self) -> dict[str, CategoryId]:
+        return {c.name: c.id for c in self.container.categorization().list_categories() if c.id is not None}
 
 
 class _TransactionsGateway:

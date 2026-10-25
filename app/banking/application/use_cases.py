@@ -251,6 +251,21 @@ class UpdateAccount:
 
 
 @dataclass
+class CreateAccountWithoutBank:
+    """An account that only holds imported history: no connection, counting as «día a día» until the user says
+    otherwise."""
+
+    uow: UnitOfWork
+
+    def __call__(self, name: str) -> AccountId:
+        with self.uow:
+            account = Account(name=name)
+            self.uow.accounts.save(account)
+            self.uow.commit()
+            return saved_id(account.id, "Account")
+
+
+@dataclass
 class OwnAccountIbans:
     uow: UnitOfWork
 
@@ -293,6 +308,7 @@ class BankingServices:
     sync_connection: SyncConnection
     sync_all: SyncAll
     update_account: UpdateAccount
+    create_account_without_bank: CreateAccountWithoutBank
     own_account_ibans: OwnAccountIbans
     account_display_names: AccountDisplayNames
     account_snapshots: AccountSnapshots
