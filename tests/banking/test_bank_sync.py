@@ -369,6 +369,27 @@ def test_no_matching_booked_transaction(client: TestClient, db: Session, fake_ba
     assert (other.external_id, other.note, other.category_manual) == ("ref:b1", None, False)
 
 
+# Requirement detail not covered by a scenario: a pending transaction passes its edits on at most once.
+@pytest.mark.usefixtures("user")
+def test_a_pending_transaction_passes_its_edits_on_once(
+    client: TestClient, db: Session, fake_bank: FakeEnableBanking
+) -> None:
+    fake_bank.transactions["u1"] = [
+        raw_tx("12.50", transaction_id="p1", status="PDNG", booking_date="2026-10-03", creditor="MERCADONA")
+    ]
+    connection_id = connect_bank(client, fake_bank, [FakeAccount(uid="u1")])
+    client.patch(f"/api/transactions/{db.scalars(select(Transaction.id)).one()}", json={"note": "cena"})
+    fake_bank.transactions["u1"] = [
+        raw_tx("12.50", reference=f"b{n}", status="BOOK", booking_date="2026-10-04", creditor="MERCADONA")
+        for n in (1, 2)
+    ]
+
+    sync(client, connection_id)
+
+    db.expire_all()
+    assert sorted(str(t.note) for t in db.scalars(select(Transaction))) == ["None", "cena"]
+
+
 # ---------- Account balance ----------
 
 

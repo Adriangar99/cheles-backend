@@ -40,9 +40,10 @@ def test_the_same_external_id_wins_over_a_closer_date() -> None:
 
 
 def test_the_closest_date_wins_then_the_lowest_id() -> None:
-    far, near_a, near_b = tx("p1", 1, id=1), tx("p2", 4, id=3), tx("p3", 6, id=2)
+    two_days, one_day_late, one_day_early = tx("p1", 3, id=1), tx("p2", 6, id=3), tx("p3", 4, id=2)
 
-    assert matching_pending(tx("b", 5), [far, near_a, near_b]) is near_b
+    assert matching_pending(tx("b", 5), [two_days, one_day_late]) is one_day_late
+    assert matching_pending(tx("b", 5), [two_days, one_day_late, one_day_early]) is one_day_early
 
 
 def test_more_than_three_days_apart_does_not_match() -> None:
