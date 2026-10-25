@@ -68,6 +68,8 @@ class PendingAuthorizationRepository(Protocol):
 
     def delete(self, state: str) -> None: ...
 
+    def delete_started_before(self, cutoff: datetime) -> None: ...
+
 
 class UnitOfWork(Protocol):
     """One transaction: changes are kept only if `commit()` is called before leaving the block."""

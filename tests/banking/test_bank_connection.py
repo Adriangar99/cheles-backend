@@ -6,6 +6,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 import pytest
+import time_machine
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -288,6 +289,30 @@ def test_reconnecting_after_removing(client: TestClient, fake_bank: FakeEnableBa
     assert connection["id"] == second
     assert [(a["id"], a["role"], a["name"]) for a in connection["accounts"]] == [(account, "savings", "Colchón")]
     assert after["detached_accounts"] == []
+
+
+# ---------- Abandoned authorizations are cleaned up ----------
+
+
+def pending_states(db: Session) -> set[str]:
+    db.expire_all()
+    return set(db.scalars(select(PendingAuth.state)))
+
+
+@pytest.mark.usefixtures("user")
+@pytest.mark.parametrize(
+    ("minutes_later", "kept"),
+    [pytest.param(120, False, id="old"), pytest.param(10, True, id="recent")],
+)
+def test_pending_authorizations_by_age(client: TestClient, db: Session, minutes_later: int, kept: bool) -> None:
+    """Scenarios: Old pending authorization, Recent pending authorization"""
+    start = datetime(2026, 10, 25, 9, 0, tzinfo=UTC)
+    with time_machine.travel(start, tick=False):
+        first = start_authorization(client)
+    with time_machine.travel(start + timedelta(minutes=minutes_later), tick=False):
+        second = start_authorization(client)
+
+    assert pending_states(db) == ({first, second} if kept else {second})
 
 
 # ---------- Missing Enable Banking configuration ----------

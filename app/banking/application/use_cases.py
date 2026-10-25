@@ -25,6 +25,8 @@ from app.shared.money import Money
 
 log = logging.getLogger(__name__)
 
+PENDING_AUTHORIZATION_TTL = timedelta(hours=1)
+
 
 @dataclass(frozen=True)
 class ConnectionView:
@@ -111,7 +113,12 @@ class StartAuthorization:
     def __call__(self, bank_name: str, country: str) -> str:
         state = self.states.new_state()
         with self.uow:
-            self.uow.pending.add(PendingAuthorization(state=state, aspsp_name=bank_name, aspsp_country=country))
+            now = self.clock.now()
+            # Flows abandoned or failed at the bank never reach the callback; forget them after a while
+            self.uow.pending.delete_started_before(now - PENDING_AUTHORIZATION_TTL)
+            self.uow.pending.add(
+                PendingAuthorization(state=state, aspsp_name=bank_name, aspsp_country=country, started_at=now)
+            )
             self.uow.commit()
         valid_until = self.clock.now() + timedelta(days=self.settings.consent_days)
         return self.provider.start_auth(bank_name, country, state, self.settings.redirect_url, valid_until)

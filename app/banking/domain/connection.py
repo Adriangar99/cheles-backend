@@ -16,6 +16,7 @@ class PendingAuthorization:
     state: str
     aspsp_name: str
     aspsp_country: str
+    started_at: datetime
 
 
 @dataclass
