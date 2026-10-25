@@ -4,7 +4,7 @@ TDD: write the scenario test first and see it fail for the right reason. Commit 
 
 ## 1. Sync and listing
 
-- [ ] 1.1 Test «Syncing an expired connection» and «Country of a connection», then skip non-active connections in `SyncConnection` and expose `country`; verify the bank-sync and accounts tests pass
+- [x] 1.1 Test «Syncing an expired connection» and «Country of a connection», then skip non-active connections in `SyncConnection` and expose `country`; verify the bank-sync and accounts tests pass
 
 ## 2. Removing a connection
 
