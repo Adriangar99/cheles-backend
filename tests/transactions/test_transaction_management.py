@@ -11,7 +11,7 @@ from app.banking.infrastructure.orm import AccountRow as Account
 from app.categorization.infrastructure.orm import CategoryRow as Category
 from app.transactions.infrastructure.orm import TransactionRow as Transaction
 from tests.fakes import FakeAccount, FakeEnableBanking
-from tests.helpers import connect_bank, login, raw_tx
+from tests.helpers import connect_bank, login, raw_tx, stored_row
 
 
 @pytest.fixture
@@ -148,7 +148,7 @@ def test_unknown_category(client: TestClient, db: Session) -> None:
 
     assert response.status_code == 400
     assert response.json() == {"detail": "Categoría inexistente"}
-    assert db.get(Transaction, tx_id).category_manual is False  # type: ignore[union-attr]
+    assert stored_row(db, Transaction, tx_id).category_manual is False
 
 
 def test_the_manual_category_is_respected(client: TestClient, db: Session, connection_id: int) -> None:
@@ -159,9 +159,7 @@ def test_the_manual_category_is_respected(client: TestClient, db: Session, conne
 
     client.post(f"/api/banks/{connection_id}/sync")
     client.post("/api/reprocess")
-
-    db.expire_all()
-    assert db.get(Transaction, tx_id).category_id == restaurants  # type: ignore[union-attr]
+    assert stored_row(db, Transaction, tx_id).category_id == restaurants
 
 
 @pytest.mark.usefixtures("connection_id")
@@ -173,8 +171,7 @@ def test_back_to_the_automatic_category(client: TestClient, db: Session) -> None
     response = client.patch(f"/api/transactions/{tx_id}", json={"clear_category": True})
 
     assert response.json()["category_manual"] is False
-    db.expire_all()
-    assert db.get(Transaction, tx_id).category_id == category_id(db, "Supermercado")  # type: ignore[union-attr]
+    assert stored_row(db, Transaction, tx_id).category_id == category_id(db, "Supermercado")
 
 
 @pytest.mark.usefixtures("connection_id")

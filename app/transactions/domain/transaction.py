@@ -1,13 +1,14 @@
 from collections.abc import Collection
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Any, Literal, Protocol
+from typing import Any, Literal, Protocol, get_args
 
 from app.shared.ids import AccountId, CategoryId, TransactionId
 from app.shared.money import Money
 from app.transactions.domain.bank_payload import NormalizedTransaction, normalize
 
 Kind = Literal["normal", "transfer"]
+KINDS: tuple[Kind, ...] = get_args(Kind)
 BOOKED = "BOOK"
 PENDING = "PDNG"
 

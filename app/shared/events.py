@@ -28,6 +28,7 @@ class InMemoryEventBus:
         self._handlers: defaultdict[type[Event], list[Callable[[Any], None]]] = defaultdict(list)
 
     def subscribe[E: Event](self, event_type: type[E], handler: Callable[[E], None]) -> None:
+        # One map holds handlers of every event type; the key guarantees each receives its own type
         self._handlers[event_type].append(cast(Callable[[Any], None], handler))
 
     def publish(self, event: Event) -> None:

@@ -7,10 +7,11 @@ import hashlib
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
-from typing import Any, cast
+from typing import Any
 
 from app.shared.money import Money
 from app.transactions.domain.counterparty import CounterpartyIban
+from app.transactions.domain.errors import UndatedTransaction
 
 DESCRIPTION_MAX_LENGTH = 1024
 
@@ -44,9 +45,10 @@ def normalize(raw: dict[str, Any]) -> NormalizedTransaction:
     description = " ".join(raw.get("remittance_information") or []).strip()
     if not description:
         description = ((raw.get("bank_transaction_code") or {}).get("description") or "").strip()
-    booking_date = date.fromisoformat(
-        cast(str, raw.get("booking_date") or raw.get("value_date") or raw.get("transaction_date"))
-    )
+    raw_date = raw.get("booking_date") or raw.get("value_date") or raw.get("transaction_date")
+    if not raw_date:
+        raise UndatedTransaction()
+    booking_date = date.fromisoformat(raw_date)
     return NormalizedTransaction(
         # The id hashes the full description, before truncation
         external_id=_external_id(raw, booking_date, amount, description),

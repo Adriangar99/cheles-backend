@@ -103,9 +103,10 @@ class FakeEnableBanking:
     def get_transactions(self, account_uid: str, date_from: date) -> list[dict[str, Any]]:
         self._record("get_transactions", account_uid, date_from, uid=account_uid)
         # Like the real API, only transactions on or after date_from (pagination is the real client's job)
-        return [t for t in self.transactions.get(account_uid, []) if _raw_date(t) >= date_from]
+        # A transaction without any date cannot be filtered out, so it is always returned
+        return [t for t in self.transactions.get(account_uid, []) if (d := _raw_date(t)) is None or d >= date_from]
 
 
-def _raw_date(raw: dict[str, Any]) -> date:
+def _raw_date(raw: dict[str, Any]) -> date | None:
     value = raw.get("booking_date") or raw.get("value_date") or raw.get("transaction_date")
-    return date.fromisoformat(str(value))
+    return date.fromisoformat(value) if value else None

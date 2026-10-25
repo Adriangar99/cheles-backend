@@ -122,3 +122,12 @@ def raw_tx(
 
 def balance(amount: str, balance_type: str) -> dict[str, Any]:
     return {"balance_type": balance_type, "balance_amount": {"amount": amount, "currency": "EUR"}}
+
+
+def stored_row[M](db: Session, model: type[M], row_id: int | None) -> M:
+    """The row as currently stored: the session is expired first, so changes made through the API are seen."""
+    db.expire_all()
+    row = db.get(model, row_id) if row_id is not None else None
+    if row is None:
+        raise AssertionError(f"No {model.__name__} stored with id {row_id}")
+    return row

@@ -1,14 +1,15 @@
 from collections.abc import Callable, Collection
 from types import TracebackType
-from typing import Self, cast
+from typing import Self
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from app.banking.domain.account import Account, AccountRole, Iban
-from app.banking.domain.connection import BankConnection, ConnectionStatus, PendingAuthorization
+from app.banking.domain.account import ACCOUNT_ROLES, Account, Iban
+from app.banking.domain.connection import CONNECTION_STATUSES, BankConnection, PendingAuthorization
 from app.banking.infrastructure.orm import AccountRow, BankConnectionRow, PendingAuthRow
 from app.shared.ids import AccountId
+from app.shared.literals import parse_literal
 from app.shared.money import Money
 
 
@@ -19,7 +20,7 @@ def _connection(row: BankConnectionRow) -> BankConnection:
         aspsp_country=row.aspsp_country,
         session_id=row.session_id,
         valid_until=row.valid_until,
-        status=cast(ConnectionStatus, row.status),
+        status=parse_literal(row.status, CONNECTION_STATUSES),
         last_synced_at=row.last_synced_at,
         last_error=row.last_error,
     )
@@ -30,7 +31,7 @@ def _account(row: AccountRow) -> Account:
         id=AccountId(row.id),
         name=row.name,
         currency=row.currency,
-        role=cast(AccountRole, row.role),
+        role=parse_literal(row.role, ACCOUNT_ROLES),
         alias=row.alias,
         iban=Iban(row.iban) if row.iban else None,
         connection_id=row.connection_id,

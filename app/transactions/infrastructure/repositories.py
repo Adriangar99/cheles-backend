@@ -1,15 +1,16 @@
 from collections.abc import Callable
 from datetime import date
 from types import TracebackType
-from typing import Self, cast
+from typing import Self
 
 from sqlalchemy import Select, delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.shared.ids import AccountId, CategoryId, TransactionId
+from app.shared.literals import parse_literal
 from app.shared.money import Money
 from app.transactions.application.ports import MovementRecord, SearchCriteria
-from app.transactions.domain.transaction import BOOKED, PENDING, Kind, Transaction
+from app.transactions.domain.transaction import BOOKED, KINDS, PENDING, Transaction
 from app.transactions.infrastructure.orm import TransactionRow
 
 
@@ -25,7 +26,7 @@ def _entity(row: TransactionRow) -> Transaction:
         counterparty_iban=row.counterparty_iban,
         description=row.description,
         raw=row.raw,
-        kind=cast(Kind, row.kind),
+        kind=parse_literal(row.kind, KINDS),
         kind_manual=row.kind_manual,
         category_id=CategoryId(row.category_id) if row.category_id is not None else None,
         category_manual=row.category_manual,
@@ -116,7 +117,7 @@ class SqlTransactionRepository:
                 account_id=AccountId(account_id),
                 booking_date=booking_date,
                 amount=amount,
-                kind=cast(Kind, kind),
+                kind=parse_literal(kind, KINDS),
                 category_id=CategoryId(category_id) if category_id is not None else None,
             )
             for account_id, booking_date, amount, kind, category_id in self.db.execute(stmt)

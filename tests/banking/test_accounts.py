@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.banking.infrastructure.orm import AccountRow as Account
 from app.transactions.infrastructure.orm import TransactionRow as Transaction
 from tests.fakes import FakeAccount, FakeEnableBanking
-from tests.helpers import connect_bank, login, raw_tx
+from tests.helpers import connect_bank, login, raw_tx, stored_row
 
 SAVINGS_IBAN = "ES9121000418450200051332"
 
@@ -110,7 +110,7 @@ def test_invalid_role(client: TestClient, db: Session, account_id: int) -> None:
     response = client.patch(f"/api/accounts/{account_id}", json={"role": "investment"})
 
     assert response.status_code == 422
-    assert db.get(Account, account_id).role == "main"  # type: ignore[union-attr]
+    assert stored_row(db, Account, account_id).role == "main"
 
 
 @pytest.mark.usefixtures("user")
@@ -149,10 +149,8 @@ def test_set_the_iban(client: TestClient, db: Session, fake_bank: FakeEnableBank
     savings = db.scalars(select(Account).where(Account.eb_uid == "savings")).one()
 
     client.patch(f"/api/accounts/{savings.id}", json={"iban": "es91 2100 0418 4502 0005 1332"})
-
-    db.expire_all()
-    assert db.get(Account, savings.id).iban == SAVINGS_IBAN  # type: ignore[union-attr]
-    assert db.get(Transaction, transaction.id).kind == "transfer"  # type: ignore[union-attr]
+    assert stored_row(db, Account, savings.id).iban == SAVINGS_IBAN
+    assert stored_row(db, Transaction, transaction.id).kind == "transfer"
 
 
 @pytest.mark.usefixtures("user")
@@ -161,14 +159,11 @@ def test_remove_the_iban(client: TestClient, db: Session, fake_bank: FakeEnableB
     transaction = transfer_to_savings_account(client, db, fake_bank)
     savings = db.scalars(select(Account).where(Account.eb_uid == "savings")).one()
     client.patch(f"/api/accounts/{savings.id}", json={"iban": SAVINGS_IBAN})
-    db.expire_all()
-    assert db.get(Transaction, transaction.id).kind == "transfer"  # type: ignore[union-attr]
+    assert stored_row(db, Transaction, transaction.id).kind == "transfer"
 
     client.patch(f"/api/accounts/{savings.id}", json={"iban": ""})
-
-    db.expire_all()
-    assert db.get(Account, savings.id).iban is None  # type: ignore[union-attr]
-    assert db.get(Transaction, transaction.id).kind == "normal"  # type: ignore[union-attr]
+    assert stored_row(db, Account, savings.id).iban is None
+    assert stored_row(db, Transaction, transaction.id).kind == "normal"
 
 
 @pytest.mark.usefixtures("user")
@@ -180,6 +175,4 @@ def test_changes_without_an_iban(client: TestClient, db: Session, fake_bank: Fak
     db.commit()
 
     client.patch(f"/api/accounts/{savings.id}", json={"role": "savings", "alias": "Hucha"})
-
-    db.expire_all()
-    assert db.get(Transaction, transaction.id).kind == "normal"  # type: ignore[union-attr]
+    assert stored_row(db, Transaction, transaction.id).kind == "normal"

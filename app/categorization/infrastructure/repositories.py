@@ -1,19 +1,24 @@
 from collections.abc import Callable, Collection
 from types import TracebackType
-from typing import Self, cast
+from typing import Self
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.categorization.domain.category import Category, CategoryKind
+from app.categorization.domain.category import CATEGORY_KINDS, Category
 from app.categorization.domain.rule import Rule
 from app.categorization.infrastructure.orm import CategoryRow, RuleRow
 from app.shared.ids import CategoryId
+from app.shared.literals import parse_literal
 
 
 def _category(row: CategoryRow) -> Category:
     return Category(
-        id=CategoryId(row.id), name=row.name, kind=cast(CategoryKind, row.kind), icon=row.icon, color=row.color
+        id=CategoryId(row.id),
+        name=row.name,
+        kind=parse_literal(row.kind, CATEGORY_KINDS),
+        icon=row.icon,
+        color=row.color,
     )
 
 
