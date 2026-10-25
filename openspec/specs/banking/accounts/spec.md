@@ -8,9 +8,9 @@ excluded), give it an alias and set its IBAN when the bank does not report it.
 ## Requirements
 
 ### Requirement: List of connections and accounts
-The system SHALL return at `GET /api/banks` the connections ordered by id, each with `bank`, `status`, `valid_until`,
-`last_synced_at`, `last_error` and its accounts, and separately in `detached_accounts` the accounts that belong to no
-connection.
+The system SHALL return at `GET /api/banks` the connections that are not `revoked`, ordered by id, each with `bank`,
+`country`, `status`, `valid_until`, `last_synced_at`, `last_error` and its accounts, and separately in
+`detached_accounts` the accounts that belong to no connection.
 
 #### Scenario: Connections with accounts
 - **WHEN** two connections with accounts exist
@@ -19,6 +19,10 @@ connection.
 #### Scenario: Accounts without a connection
 - **WHEN** an account has no associated connection
 - **THEN** it appears in `detached_accounts`
+
+#### Scenario: Country of a connection
+- **WHEN** a connection with Revolut was authorized for country `LT`
+- **THEN** it is listed with `country` `LT`
 
 ### Requirement: Account representation
 Each account SHALL be exposed with `id`, `name` (its alias if set, otherwise the bank's name for it), `iban_tail` (last
