@@ -1,5 +1,7 @@
-"""FastAPI adapter for transactions: listing, manual edits and reprocessing."""
+"""FastAPI adapter for transactions: listing, manual edits, reprocessing and importing history."""
 
+import base64
+import binascii
 import datetime
 from typing import Any, Literal
 
@@ -12,7 +14,11 @@ from app.shared.ids import AccountId, CategoryId, TransactionId
 from app.shared.year_month import YearMonth
 from app.transactions.application.ports import SearchCriteria
 from app.transactions.application.use_cases import TransactionEdit, TransactionsServices, TransactionView
-from app.transactions.domain.errors import TransactionNotFound, UnknownCategory
+from app.transactions.domain.errors import TransactionNotFound, UnknownCategory, UnknownImportTarget
+from app.transactions.domain.history_import import NEW, ImportPlan, Target
+from app.transactions.domain.moneylover import UnreadableRow, UnrecognizedFile
+
+MAX_IMPORT_BYTES = 5 * 1024 * 1024
 
 
 def transactions_services() -> TransactionsServices:
@@ -121,3 +127,109 @@ def reprocess(
     services: TransactionsServices = Depends(transactions_services), _: AuthenticatedUser = Depends(require_user)
 ) -> dict[str, Any]:
     return {"processed": services.reprocess_all()}
+
+
+class ImportIn(BaseModel):
+    file: str  # the CSV file, base64
+    accounts: dict[str, int | Literal["new"] | None]  # wallet → existing account id, a new account, or not imported
+
+
+class ImportWalletOut(BaseModel):
+    name: str
+    rows: int
+    first_date: datetime.date
+    last_date: datetime.date
+    target: int | Literal["new"] | None
+    to_import: int
+    skipped: int  # on or after `bank_since`: the bank already has them
+    bank_since: datetime.date | None
+    already_imported: int
+    adjustments: int  # balance corrections, never imported
+
+
+class UnmatchedCategoryOut(BaseModel):
+    name: str
+    rows: int
+
+
+class ImportPreviewOut(BaseModel):
+    wallets: list[ImportWalletOut]
+    unmatched_categories: list[UnmatchedCategoryOut]
+
+
+class ImportResultOut(BaseModel):
+    imported: int
+    skipped: int
+    already_imported: int
+    adjustments: int
+
+
+def _import_input(body: ImportIn) -> tuple[bytes, dict[str, Target]]:
+    try:
+        content = base64.b64decode(body.file, validate=True)
+    except binascii.Error:
+        raise HTTPException(422, "El fichero no se ha podido leer") from None
+    if len(content) > MAX_IMPORT_BYTES:
+        raise HTTPException(413, "El fichero es demasiado grande (máximo 5 MB)")
+    targets: dict[str, Target] = {
+        wallet: NEW if target == NEW else AccountId(target) if target is not None else None
+        for wallet, target in body.accounts.items()
+    }
+    return content, targets
+
+
+def _rejected(error: Exception) -> HTTPException:
+    return HTTPException(422, str(error))
+
+
+def _serialize_plan(plan: ImportPlan) -> dict[str, Any]:
+    return {
+        "wallets": [
+            {
+                "name": w.name,
+                "rows": len(w.rows),
+                "first_date": w.first_date,
+                "last_date": w.last_date,
+                "target": w.target,
+                "to_import": len(w.to_import),
+                "skipped": w.skipped,
+                "bank_since": w.bank_since,
+                "already_imported": w.already_imported,
+                "adjustments": w.adjustments,
+            }
+            for w in plan.wallets
+        ],
+        "unmatched_categories": [{"name": name, "rows": rows} for name, rows in plan.unmatched_categories],
+    }
+
+
+@router.post("/api/imports/preview", response_model=ImportPreviewOut)
+def preview_import(
+    body: ImportIn,
+    services: TransactionsServices = Depends(transactions_services),
+    _: AuthenticatedUser = Depends(require_user),
+) -> dict[str, Any]:
+    content, targets = _import_input(body)
+    try:
+        return _serialize_plan(services.preview_import(content, targets))
+    except (UnrecognizedFile, UnreadableRow, UnknownImportTarget) as error:
+        raise _rejected(error) from None
+
+
+@router.post("/api/imports", response_model=ImportResultOut)
+def run_import(
+    body: ImportIn,
+    services: TransactionsServices = Depends(transactions_services),
+    _: AuthenticatedUser = Depends(require_user),
+) -> dict[str, Any]:
+    content, targets = _import_input(body)
+    try:
+        result = services.run_import(content, targets)
+    except (UnrecognizedFile, UnreadableRow, UnknownImportTarget) as error:
+        raise _rejected(error) from None
+    return {
+        "imported": result.imported,
+        "skipped": result.skipped,
+        "already_imported": result.already_imported,
+        "adjustments": result.adjustments,
+    }

@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, Literal
@@ -7,13 +7,22 @@ from typing import Any, Literal
 from app.shared.ids import AccountId, CategoryId, TransactionId
 from app.transactions.application.ports import (
     CategoryCatalog,
+    CategoryNames,
     CategorySuggestions,
+    ImportAccounts,
     MovementRecord,
     OwnAccounts,
     SearchCriteria,
     UnitOfWork,
 )
-from app.transactions.domain.errors import TransactionNotFound, UndatedTransaction, UnknownCategory
+from app.transactions.domain.errors import (
+    TransactionNotFound,
+    UndatedTransaction,
+    UnknownCategory,
+    UnknownImportTarget,
+)
+from app.transactions.domain.history_import import NEW, ImportPlan, Target, chosen_category, name_key, plan_import
+from app.transactions.domain.moneylover import read_export
 from app.transactions.domain.pending import matching_pending
 from app.transactions.domain.transaction import Transaction
 
@@ -93,7 +102,8 @@ class LatestBookedDate:
 
 @dataclass
 class ReprocessAll:
-    """Recomputes every transaction from its stored payload; manual categories and notes are kept."""
+    """Recomputes every transaction from its stored payload; manual categories and notes are kept. Imported
+    transactions have no bank payload: they stay as imported and only their derived fields are recomputed."""
 
     uow: UnitOfWork
     own_accounts: OwnAccounts
@@ -105,7 +115,8 @@ class ReprocessAll:
             suggester = self.suggestions.load()
             transactions = self.uow.transactions.all()
             for transaction in transactions:
-                transaction.refresh_from(transaction.raw)
+                if transaction.source == "bank":
+                    transaction.refresh_from(transaction.raw)
                 transaction.derive(ibans, suggester)
                 self.uow.transactions.save(transaction)
             self.uow.commit()
@@ -162,6 +173,71 @@ class EditTransaction:
 
 
 @dataclass(frozen=True)
+class ImportResult:
+    imported: int
+    skipped: int
+    already_imported: int
+    adjustments: int
+
+
+@dataclass
+class PreviewImport:
+    """What importing a MoneyLover export with these targets would do; writes nothing."""
+
+    uow: UnitOfWork
+    accounts: ImportAccounts
+    categories: CategoryNames
+
+    def __call__(self, content: bytes, targets: Mapping[str, Target]) -> ImportPlan:
+        return _plan(self.uow, self.accounts, self.categories, content, targets)
+
+
+@dataclass
+class RunImport:
+    """Imports a MoneyLover export: creates the new accounts, then stores the rows the plan imports."""
+
+    uow: UnitOfWork
+    accounts: ImportAccounts
+    categories: CategoryNames
+    suggestions: CategorySuggestions
+
+    def __call__(self, content: bytes, targets: Mapping[str, Target]) -> ImportResult:
+        plan = _plan(self.uow, self.accounts, self.categories, content, targets)
+        catalog = {name_key(name): category_id for name, category_id in self.categories.ids_by_name().items()}
+        with self.uow:
+            suggester = self.suggestions.load()
+            for wallet in plan.wallets:
+                if wallet.target is None:
+                    continue
+                account_id = self.accounts.create_without_bank(wallet.name) if wallet.target == NEW else wallet.target
+                for row in wallet.to_import:
+                    chosen = chosen_category(row.category, catalog)
+                    self.uow.transactions.save(Transaction.imported(account_id, row, chosen, suggester))
+            self.uow.commit()
+        return ImportResult(
+            imported=sum(len(w.to_import) for w in plan.wallets),
+            skipped=sum(w.skipped for w in plan.wallets),
+            already_imported=sum(w.already_imported for w in plan.wallets),
+            adjustments=sum(w.adjustments for w in plan.wallets),
+        )
+
+
+def _plan(
+    uow: UnitOfWork, accounts: ImportAccounts, categories: CategoryNames, content: bytes, targets: Mapping[str, Target]
+) -> ImportPlan:
+    rows = read_export(content)
+    existing = {target for target in targets.values() if target is not None and target != NEW}
+    unknown = existing - set(accounts.display_names(existing))
+    if unknown:
+        raise UnknownImportTarget(f"La cuenta {min(unknown)} no existe")
+    catalog = {name_key(name): category_id for name, category_id in categories.ids_by_name().items()}
+    with uow:
+        bank_since = {account_id: uow.transactions.earliest_bank_date(account_id) for account_id in existing}
+        imported = {account_id: uow.transactions.imported_ids(account_id) for account_id in existing}
+    return plan_import(rows, targets, bank_since, imported, catalog)
+
+
+@dataclass(frozen=True)
 class TransactionsServices:
     """The transactions use cases bound to one unit of work."""
 
@@ -171,3 +247,5 @@ class TransactionsServices:
     reprocess_all: ReprocessAll
     list_transactions: ListTransactions
     edit_transaction: EditTransaction
+    preview_import: PreviewImport
+    run_import: RunImport

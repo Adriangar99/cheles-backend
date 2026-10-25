@@ -19,14 +19,20 @@ links to them, and every scenario there has a test.
 - Account roles (`main`, `savings`, `excluded`), alias and manual IBAN; IBAN changes reprocess every transaction.
 - A missing Enable Banking configuration answers 503 «Enable Banking no está configurado».
 
-## Transactions — [ingestion](../openspec/specs/transactions/transaction-ingestion/spec.md), [management](../openspec/specs/transactions/transaction-management/spec.md), [reprocessing](../openspec/specs/transactions/reprocessing/spec.md)
+## Transactions — [ingestion](../openspec/specs/transactions/transaction-ingestion/spec.md), [management](../openspec/specs/transactions/transaction-management/spec.md), [reprocessing](../openspec/specs/transactions/reprocessing/spec.md), [history import](../openspec/specs/transactions/history-import/spec.md)
 
 - Transactions are stored exactly as the bank returns them (`raw`) and normalized (date, amount, counterparty,
   description); duplicates are detected by bank ids or a content hash; undated ones are skipped.
 - Transfers between your own accounts (by IBAN) count as neither expense nor income.
 - Listing with month, search, category, account and kind filters; manual category, manual transfer mark (⇄) and note,
   all kept by syncs and reprocessing, and carried over when a pending transaction is booked.
-- Reprocessing recomputes everything from `raw` without calling the bank.
+- Reprocessing recomputes everything from `raw` without calling the bank; imported transactions stay as imported.
+- History import from a MoneyLover CSV export (`POST /api/imports/preview`, then `POST /api/imports`): each
+  MoneyLover wallet goes to an existing account, a new account without a bank, or nowhere. On an account with a bank
+  only rows before its first bank transaction are imported; importing again (or a newer export) adds only new rows;
+  balance adjustments («Ajuste») are left out. Categories: MoneyLover's built-in ones through a fixed equivalence
+  table, then the same name, then the automatic rules on the note. MoneyLover transfers come in as ordinary income
+  and spending: mark the ones between your own accounts with ⇄.
 
 ## Categorization — [transaction categorization](../openspec/specs/categorization/transaction-categorization/spec.md)
 

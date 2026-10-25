@@ -46,7 +46,17 @@ class TransactionRepository(Protocol):
         """Newest first (date, then id, descending)."""
         ...
 
-    def latest_booked_date(self, account_id: AccountId) -> date | None: ...
+    def latest_booked_date(self, account_id: AccountId) -> date | None:
+        """The latest booked date among the account's bank transactions (imported history does not count)."""
+        ...
+
+    def earliest_bank_date(self, account_id: AccountId) -> date | None:
+        """The earliest date among the account's bank transactions: where its imported history must stop."""
+        ...
+
+    def imported_ids(self, account_id: AccountId) -> set[str]:
+        """External ids of the account's imported transactions."""
+        ...
 
     def movement_records(self, start: date | None, end: date | None) -> list[MovementRecord]:
         """Movements with `start <= booking_date < end` (either bound optional)."""
@@ -94,3 +104,17 @@ class CategorySuggestions(Protocol):
 
 class CategoryCatalog(Protocol):
     def exists(self, category_id: CategoryId) -> bool: ...
+
+
+class ImportAccounts(Protocol):
+    """The accounts an import can target (served by banking through the composition root)."""
+
+    def display_names(self, account_ids: Collection[AccountId]) -> dict[AccountId, str]: ...
+
+    def create_without_bank(self, name: str) -> AccountId: ...
+
+
+class CategoryNames(Protocol):
+    """Every category's id by its name (served by categorization through the composition root)."""
+
+    def ids_by_name(self) -> dict[str, CategoryId]: ...

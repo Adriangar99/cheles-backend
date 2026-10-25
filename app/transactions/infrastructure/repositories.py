@@ -10,7 +10,7 @@ from app.shared.ids import AccountId, CategoryId, TransactionId
 from app.shared.literals import parse_literal
 from app.shared.money import Money
 from app.transactions.application.ports import MovementRecord, SearchCriteria
-from app.transactions.domain.transaction import BOOKED, KINDS, PENDING, Transaction
+from app.transactions.domain.transaction import BOOKED, KINDS, PENDING, SOURCES, Transaction
 from app.transactions.infrastructure.orm import TransactionRow
 
 
@@ -26,6 +26,7 @@ def _entity(row: TransactionRow) -> Transaction:
         counterparty_iban=row.counterparty_iban,
         description=row.description,
         raw=row.raw,
+        source=parse_literal(row.source, SOURCES),
         kind=parse_literal(row.kind, KINDS),
         kind_manual=row.kind_manual,
         category_id=CategoryId(row.category_id) if row.category_id is not None else None,
@@ -45,6 +46,7 @@ def _copy_to_row(transaction: Transaction, row: TransactionRow) -> None:
     row.counterparty_iban = transaction.counterparty_iban
     row.description = transaction.description
     row.raw = transaction.raw
+    row.source = transaction.source
     row.kind = transaction.kind
     row.kind_manual = transaction.kind_manual
     row.category_id = transaction.category_id
@@ -96,7 +98,25 @@ class SqlTransactionRepository:
     def latest_booked_date(self, account_id: AccountId) -> date | None:
         return self.db.scalar(
             select(func.max(TransactionRow.booking_date)).where(
-                TransactionRow.account_id == account_id, TransactionRow.status == BOOKED
+                TransactionRow.account_id == account_id,
+                TransactionRow.status == BOOKED,
+                TransactionRow.source == "bank",
+            )
+        )
+
+    def earliest_bank_date(self, account_id: AccountId) -> date | None:
+        return self.db.scalar(
+            select(func.min(TransactionRow.booking_date)).where(
+                TransactionRow.account_id == account_id, TransactionRow.source == "bank"
+            )
+        )
+
+    def imported_ids(self, account_id: AccountId) -> set[str]:
+        return set(
+            self.db.scalars(
+                select(TransactionRow.external_id).where(
+                    TransactionRow.account_id == account_id, TransactionRow.source == "import"
+                )
             )
         )
 

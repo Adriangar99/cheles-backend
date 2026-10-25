@@ -5,10 +5,14 @@ from typing import Any, Literal, Protocol, get_args
 
 from app.shared.ids import AccountId, CategoryId, TransactionId
 from app.shared.money import Money
-from app.transactions.domain.bank_payload import NormalizedTransaction, normalize
+from app.transactions.domain.bank_payload import DESCRIPTION_MAX_LENGTH, NormalizedTransaction, normalize
+from app.transactions.domain.moneylover import ImportedRow
 
 Kind = Literal["normal", "transfer"]
 KINDS: tuple[Kind, ...] = get_args(Kind)
+# Where a transaction comes from: the bank (rebuilt from its payload) or an imported file (kept as imported)
+Source = Literal["bank", "import"]
+SOURCES: tuple[Source, ...] = get_args(Source)
 BOOKED = "BOOK"
 PENDING = "PDNG"
 
@@ -30,6 +34,7 @@ class Transaction:
     counterparty_iban: str | None
     description: str
     raw: dict[str, Any] = field(repr=False)
+    source: Source = "bank"
     kind: Kind = "normal"
     kind_manual: bool = False  # set by hand (⇄); sync and reprocessing keep it
     category_id: CategoryId | None = None
@@ -52,6 +57,29 @@ class Transaction:
             raw=raw,
         )
         transaction.refresh_from(raw, data)
+        return transaction
+
+    @classmethod
+    def imported(
+        cls, account_id: AccountId, row: ImportedRow, chosen: CategoryId | None, suggester: CategorySuggester
+    ) -> "Transaction":
+        """A row of an imported file: booked, described by its note (or its category name when it has none). The
+        category the user chose in the other app is kept as manual; without one, the automatic rules decide."""
+        transaction = cls(
+            account_id=account_id,
+            external_id=row.external_id,
+            booking_date=row.booking_date,
+            amount=row.amount,
+            status=BOOKED,
+            counterparty=None,
+            counterparty_iban=None,
+            description=(row.note or row.category)[:DESCRIPTION_MAX_LENGTH],
+            raw=dict(row.raw),
+            source="import",
+            category_id=chosen,
+            category_manual=chosen is not None,
+        )
+        transaction.derive(own_ibans=(), suggester=suggester)
         return transaction
 
     def refresh_from(self, raw: dict[str, Any], data: NormalizedTransaction | None = None) -> None:
