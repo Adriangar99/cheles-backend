@@ -36,6 +36,16 @@ def transfer_to_savings_account(client: TestClient, db: Session, fake_bank: Fake
 
 
 @pytest.mark.usefixtures("user")
+def test_country_of_a_connection(client: TestClient, fake_bank: FakeEnableBanking) -> None:
+    """Scenario: Country of a connection"""
+    connect_bank(client, fake_bank, [FakeAccount(uid="r1")], bank="Revolut", country="LT")
+
+    [connection] = client.get("/api/banks").json()["connections"]
+
+    assert (connection["bank"], connection["country"]) == ("Revolut", "LT")
+
+
+@pytest.mark.usefixtures("user")
 def test_connections_with_accounts(client: TestClient, fake_bank: FakeEnableBanking) -> None:
     """Scenario: Connections with accounts"""
     first = connect_bank(client, fake_bank, [FakeAccount(uid="a1")], bank="BBVA", code="c1")
@@ -50,6 +60,7 @@ def test_connections_with_accounts(client: TestClient, fake_bank: FakeEnableBank
     assert set(body["connections"][0]) == {
         "id",
         "bank",
+        "country",
         "status",
         "valid_until",
         "last_synced_at",

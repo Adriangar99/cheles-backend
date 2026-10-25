@@ -105,6 +105,9 @@ class SyncConnection:
             connection = self.uow.connections.by_id(connection_id)
             if connection is None:
                 raise ConnectionNotFound()
+            # The bank already rejected (or the user removed) this consent: report it without calling the provider
+            if connection.status != "active":
+                return SyncResult(0, connection.status, connection.last_error)
             if connection.consent_expired(self.clock.now()):
                 connection.status = "expired"
                 self.uow.connections.save(connection)

@@ -71,9 +71,10 @@ def connect_bank(
     bank: str = "BBVA",
     code: str = "auth-code",
     valid_until: str = "2027-04-01T00:00:00+00:00",
+    country: str | None = None,
 ) -> int:
     """Runs the whole authorization flow against the fake bank and returns the new connection id."""
-    response = client.post("/api/banks/connect", json={"name": bank})
+    response = client.post("/api/banks/connect", json={"name": bank, **({"country": country} if country else {})})
     assert response.status_code == 200, response.text
     state = parse_qs(urlparse(response.json()["url"]).query)["state"][0]
     fake.add_session(code, accounts, valid_until)

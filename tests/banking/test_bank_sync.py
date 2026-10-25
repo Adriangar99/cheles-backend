@@ -172,6 +172,22 @@ def test_consent_past_its_expiry(
     assert connection_state(client, connection_id)["last_synced_at"] == last_synced_at
 
 
+@pytest.mark.usefixtures("user")
+def test_syncing_an_expired_connection(client: TestClient, db: Session, fake_bank: FakeEnableBanking) -> None:
+    """Scenario: Syncing an expired connection"""
+    connection_id = connect_bank(client, fake_bank, [FakeAccount(uid="u1")])  # consent valid until 2027
+    stored_row(db, BankConnection, connection_id).status = "expired"
+    db.commit()
+    last_synced_at = connection_state(client, connection_id)["last_synced_at"]
+    fake_bank.calls.clear()
+
+    result = sync(client, connection_id)
+
+    assert result == {"new": 0, "status": "expired", "error": None}
+    assert fake_bank.calls == []
+    assert connection_state(client, connection_id)["last_synced_at"] == last_synced_at
+
+
 # ---------- Incremental read window ----------
 
 

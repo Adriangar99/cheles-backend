@@ -37,6 +37,7 @@ def _serialize_connection(view: ConnectionView) -> dict[str, Any]:
     return {
         "id": c.id,
         "bank": c.aspsp_name,
+        "country": c.aspsp_country,
         "status": c.status,
         "valid_until": c.valid_until,
         "last_synced_at": c.last_synced_at,
@@ -59,6 +60,7 @@ class AccountOut(BaseModel):
 class ConnectionOut(BaseModel):
     id: int
     bank: str
+    country: str
     status: Literal["active", "expired", "revoked"]
     valid_until: JsonDateTime
     last_synced_at: JsonDateTime | None
