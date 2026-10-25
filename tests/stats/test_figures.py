@@ -11,6 +11,7 @@ from app.stats.domain.figures import (
     balances_by_role,
     history,
     month_figures,
+    other_currencies,
 )
 
 MAIN, SAVINGS, EXCLUDED = AccountId(1), AccountId(2), AccountId(3)
@@ -25,13 +26,18 @@ OCTOBER = YearMonth(2026, 10)
 
 
 def mv(
-    amount: str, day: str = "2026-10-05", account: AccountId = MAIN, kind: str = "normal", cat: int | None = 1
+    amount: str,
+    day: str = "2026-10-05",
+    account: AccountId = MAIN,
+    kind: str = "normal",
+    cat: int | None = 1,
+    currency: str = "EUR",
 ) -> Movement:
     return Movement(
         account_id=account,
         booking_date=date.fromisoformat(day),
         amount=Decimal(amount),
-        currency="EUR",
+        currency=currency,
         kind="transfer" if kind == "transfer" else "normal",
         category_id=CategoryId(cat) if cat is not None else None,
     )
@@ -100,3 +106,28 @@ def test_balances_by_role() -> None:
 
 def test_balances_omit_roles_without_accounts() -> None:
     assert balances_by_role(STANDINGS[:1]) == {"main": Decimal("1000"), "total": Decimal("1000")}
+
+
+# ---------- Currencies (API scenarios cover a dollar balance; these cover the rest) ----------
+
+
+def test_savings_ignore_transfers_in_another_currency() -> None:
+    figures = month_figures(
+        OCTOBER,
+        [mv("100", account=SAVINGS, kind="transfer"), mv("50", account=SAVINGS, kind="transfer", currency="USD")],
+        STANDINGS,
+    )
+
+    assert figures.saved == Decimal("100")
+
+
+def test_a_movement_in_another_currency_is_reported() -> None:
+    assert other_currencies(OCTOBER, [mv("-40", currency="USD")], STANDINGS) == ["USD"]
+
+
+def test_excluded_accounts_are_not_reported() -> None:
+    dollars = AccountStanding(
+        AccountId(9), counts=False, is_savings=False, balance_group="excluded", currency="USD", balance=Decimal("300")
+    )
+
+    assert other_currencies(OCTOBER, [mv("-40", account=AccountId(9), currency="USD")], [*STANDINGS, dollars]) == []
