@@ -4,7 +4,7 @@ TDD: write the scenario test first and see it fail; refactors keep every test gr
 
 ## 1. Undated transactions
 
-- [ ] 1.1 Test «No date at all» (a sync with one dated and one undated transaction), then raise `UndatedTransaction` in `normalize()` and skip it in `Ingest` with a warning; verify the ingestion and sync tests pass and mutation-check the skip
+- [x] 1.1 Test «No date at all» (a sync with one dated and one undated transaction), then raise `UndatedTransaction` in `normalize()` and skip it in `Ingest` with a warning; verify the ingestion and sync tests pass and mutation-check the skip
 
 ## 2. Invariants and literals
 
