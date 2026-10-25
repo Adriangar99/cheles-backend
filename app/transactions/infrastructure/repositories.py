@@ -123,10 +123,11 @@ class SqlTransactionRepository:
             for account_id, booking_date, amount, kind, category_id in self.db.execute(stmt)
         ]
 
-    def delete_pending(self, account_id: AccountId) -> None:
-        self.db.execute(
-            delete(TransactionRow).where(TransactionRow.account_id == account_id, TransactionRow.status == PENDING)
-        )
+    def pop_pending(self, account_id: AccountId) -> list[Transaction]:
+        pending = (TransactionRow.account_id == account_id, TransactionRow.status == PENDING)
+        removed = [_entity(row) for row in self.db.scalars(select(TransactionRow).where(*pending))]
+        self.db.execute(delete(TransactionRow).where(*pending))
+        return removed
 
     def save(self, transaction: Transaction) -> None:
         row = self.db.get(TransactionRow, transaction.id) if transaction.id is not None else None
