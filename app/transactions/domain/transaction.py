@@ -9,6 +9,9 @@ from app.transactions.domain.bank_payload import NormalizedTransaction, normaliz
 
 Kind = Literal["normal", "transfer"]
 KINDS: tuple[Kind, ...] = get_args(Kind)
+# Where a transaction comes from: the bank (rebuilt from its payload) or an imported file (kept as imported)
+Source = Literal["bank", "import"]
+SOURCES: tuple[Source, ...] = get_args(Source)
 BOOKED = "BOOK"
 PENDING = "PDNG"
 
@@ -30,6 +33,7 @@ class Transaction:
     counterparty_iban: str | None
     description: str
     raw: dict[str, Any] = field(repr=False)
+    source: Source = "bank"
     kind: Kind = "normal"
     kind_manual: bool = False  # set by hand (⇄); sync and reprocessing keep it
     category_id: CategoryId | None = None

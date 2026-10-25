@@ -93,7 +93,8 @@ class LatestBookedDate:
 
 @dataclass
 class ReprocessAll:
-    """Recomputes every transaction from its stored payload; manual categories and notes are kept."""
+    """Recomputes every transaction from its stored payload; manual categories and notes are kept. Imported
+    transactions have no bank payload: they stay as imported and only their derived fields are recomputed."""
 
     uow: UnitOfWork
     own_accounts: OwnAccounts
@@ -105,7 +106,8 @@ class ReprocessAll:
             suggester = self.suggestions.load()
             transactions = self.uow.transactions.all()
             for transaction in transactions:
-                transaction.refresh_from(transaction.raw)
+                if transaction.source == "bank":
+                    transaction.refresh_from(transaction.raw)
                 transaction.derive(ibans, suggester)
                 self.uow.transactions.save(transaction)
             self.uow.commit()

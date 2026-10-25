@@ -1,5 +1,6 @@
 """Characterization of `transactions/reprocessing`."""
 
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -92,6 +93,36 @@ def test_new_own_account(client: TestClient, db: Session) -> None:
     client.post("/api/reprocess")
 
     assert by_reference(db, "to-savings").kind == "transfer"
+
+
+@pytest.mark.usefixtures("stored")
+def test_imported_transaction(client: TestClient, db: Session) -> None:
+    """Scenario: Imported transaction"""
+    account = db.scalars(select(Account).where(Account.eb_uid == "main")).one()
+    restaurants = db.scalars(select(Category.id).where(Category.name == "Restaurantes")).one()
+    row = {"Fecha": "03/05/2025", "Categoria": "Comer en casa o fuera", "Cantidad": "-8.80", "Nota": "Churros"}
+    imported = Transaction(
+        account_id=account.id,
+        external_id="ml:churros",
+        booking_date=date(2025, 5, 3),
+        amount=Decimal("-8.80"),
+        currency="EUR",
+        status="BOOK",
+        description="Churros",
+        raw=row,
+        source="import",
+        category_id=restaurants,
+        category_manual=True,
+    )
+    db.add(imported)
+    db.commit()
+
+    assert client.post("/api/reprocess").json() == {"processed": 4}
+
+    db.expire_all()
+    kept = db.scalars(select(Transaction).where(Transaction.external_id == "ml:churros")).one()
+    assert (kept.booking_date, kept.amount, kept.description) == (date(2025, 5, 3), Decimal("-8.80"), "Churros")
+    assert category_name(kept) == "Restaurantes"
 
 
 # ---------- Reprocessing respects manual edits ----------

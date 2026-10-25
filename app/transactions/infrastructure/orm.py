@@ -24,6 +24,7 @@ class TransactionRow(Base):
     counterparty: Mapped[str | None] = mapped_column(String(256))
     counterparty_iban: Mapped[str | None] = mapped_column(String(34))
     description: Mapped[str] = mapped_column(String(1024), default="")
+    source: Mapped[str] = mapped_column(String(8), default="bank", server_default="bank")  # bank | import
     kind: Mapped[str] = mapped_column(String(16), default="normal")  # normal | transfer (between own accounts)
     kind_manual: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id", ondelete="SET NULL"))
