@@ -266,7 +266,7 @@ class AccountSnapshots:
     def __call__(self) -> list[AccountSnapshot]:
         with self.uow:
             return [
-                AccountSnapshot(a.id, a.role, a.balance.amount if a.balance else None)
+                AccountSnapshot(a.id, a.role, a.currency, a.balance.amount if a.balance else None)
                 for a in self.uow.accounts.all()
                 if a.id is not None
             ]

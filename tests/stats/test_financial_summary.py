@@ -58,6 +58,32 @@ def summary(client: TestClient, month: str | None = "2026-10") -> dict[str, Any]
 # ---------- Counted transactions ----------
 
 
+def usd(amount: str, reference: str) -> dict[str, Any]:
+    """A debit in dollars."""
+    return raw_tx(amount, reference=reference, transaction_amount={"amount": amount, "currency": "USD"})
+
+
+def connect_with_dollar_account(client: TestClient, db: Session, fake_bank: FakeEnableBanking) -> None:
+    """main (€1000), savings (€5000), excluded other (€200) and a main account in dollars ($300)."""
+    login(client, db)
+    fake_bank.balances.update(
+        {
+            "main": [balance("1000.00", "ITAV")],
+            "savings": [balance("5000.00", "ITAV")],
+            "other": [balance("200.00", "ITAV")],
+            "usd": [balance("300.00", "ITAV")],
+        }
+    )
+    connect_bank(
+        client,
+        fake_bank,
+        [FakeAccount(uid=uid) for uid in ("main", "savings", "other")] + [FakeAccount(uid="usd", currency="USD")],
+    )
+    for uid, role in {"savings": "savings", "other": "excluded"}.items():
+        account_id = db.scalars(select(Account.id).where(Account.eb_uid == uid)).one()
+        client.patch(f"/api/accounts/{account_id}", json={"role": role})
+
+
 def test_own_account_transfer(bank: Any, client: TestClient) -> None:
     """Scenario: Own-account transfer"""
     bank(
@@ -68,6 +94,13 @@ def test_own_account_transfer(bank: Any, client: TestClient) -> None:
     result = summary(client)
 
     assert (result["income"], result["expenses"]) == (0, 0)
+
+
+def test_another_currency(bank: Any, client: TestClient) -> None:
+    """Scenario: Another currency"""
+    bank(main=[raw_tx("20.00", reference="eur", creditor="MERCADONA"), usd("40.00", "usd")])
+
+    assert summary(client)["expenses"] == 20
 
 
 def test_excluded_account(bank: Any, client: TestClient) -> None:
@@ -247,6 +280,13 @@ def test_balances(bank: Any, client: TestClient, fake_bank: FakeEnableBanking) -
     assert summary(client)["balances"] == {"main": 1000, "savings": 5000, "total": 6000}
 
 
+def test_account_in_another_currency(client: TestClient, db: Session, fake_bank: FakeEnableBanking) -> None:
+    """Scenario: Account in another currency"""
+    connect_with_dollar_account(client, db, fake_bank)
+
+    assert summary(client)["balances"] == {"main": 1000, "savings": 5000, "total": 6000}
+
+
 def test_roles_without_accounts_are_omitted(client: TestClient, db: Session, fake_bank: FakeEnableBanking) -> None:
     """Roles without accounts do not appear (part of «Balances by role»)."""
     login(client, db)
@@ -254,3 +294,20 @@ def test_roles_without_accounts_are_omitted(client: TestClient, db: Session, fak
     connect_bank(client, fake_bank, [FakeAccount(uid="main")])
 
     assert summary(client)["balances"] == {"main": 1000, "total": 1000}
+
+
+# ---------- Amounts left out by currency ----------
+
+
+def test_everything_in_euros(bank: Any, client: TestClient) -> None:
+    """Scenario: Everything in euros"""
+    bank(main=[raw_tx("20.00", reference="eur", creditor="MERCADONA")])
+
+    assert summary(client)["other_currencies"] == []
+
+
+def test_dollars_left_out(client: TestClient, db: Session, fake_bank: FakeEnableBanking) -> None:
+    """Scenario: Dollars left out"""
+    connect_with_dollar_account(client, db, fake_bank)
+
+    assert summary(client)["other_currencies"] == ["USD"]

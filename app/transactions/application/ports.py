@@ -30,6 +30,7 @@ class MovementRecord:
     account_id: AccountId
     booking_date: date
     amount: Decimal  # signed: negative means money going out
+    currency: str
     kind: Literal["normal", "transfer"]
     category_id: CategoryId | None
 

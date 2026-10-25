@@ -15,9 +15,11 @@ from app.stats.domain.figures import (
 
 MAIN, SAVINGS, EXCLUDED = AccountId(1), AccountId(2), AccountId(3)
 STANDINGS = [
-    AccountStanding(MAIN, counts=True, is_savings=False, balance_group="main", balance=Decimal("1000")),
-    AccountStanding(SAVINGS, counts=True, is_savings=True, balance_group="savings", balance=None),
-    AccountStanding(EXCLUDED, counts=False, is_savings=False, balance_group="excluded", balance=Decimal("200")),
+    AccountStanding(MAIN, counts=True, is_savings=False, balance_group="main", currency="EUR", balance=Decimal("1000")),
+    AccountStanding(SAVINGS, counts=True, is_savings=True, balance_group="savings", currency="EUR", balance=None),
+    AccountStanding(
+        EXCLUDED, counts=False, is_savings=False, balance_group="excluded", currency="EUR", balance=Decimal("200")
+    ),
 ]
 OCTOBER = YearMonth(2026, 10)
 
@@ -29,6 +31,7 @@ def mv(
         account_id=account,
         booking_date=date.fromisoformat(day),
         amount=Decimal(amount),
+        currency="EUR",
         kind="transfer" if kind == "transfer" else "normal",
         category_id=CategoryId(cat) if cat is not None else None,
     )

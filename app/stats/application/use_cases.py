@@ -12,6 +12,7 @@ from app.stats.domain.figures import (
     balances_by_role,
     history,
     month_figures,
+    other_currencies,
 )
 
 
@@ -21,6 +22,7 @@ class Summary:
     figures: MonthFigures
     labels: dict[CategoryId | None, SpendingLabel]
     balances: dict[str, Decimal]
+    other_currencies: list[str]
 
 
 @dataclass
@@ -35,14 +37,17 @@ class MonthlySummary:
             today = self.clock.today()
             month = YearMonth(today.year, today.month)
         standings = self.accounts.standings()
-        figures = month_figures(month, self.movements.between(month.start, month.end), standings)
+        movements = self.movements.between(month.start, month.end)
+        figures = month_figures(month, movements, standings)
         ids = {s.category_id for s in figures.by_category if s.category_id is not None}
         known = self.labels.labels(ids)
         labels = {
             s.category_id: known.get(s.category_id, UNCATEGORIZED) if s.category_id is not None else UNCATEGORIZED
             for s in figures.by_category
         }
-        return Summary(month, figures, labels, balances_by_role(standings))
+        return Summary(
+            month, figures, labels, balances_by_role(standings), other_currencies(month, movements, standings)
+        )
 
 
 @dataclass

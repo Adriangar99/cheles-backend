@@ -105,6 +105,7 @@ class SqlTransactionRepository:
             TransactionRow.account_id,
             TransactionRow.booking_date,
             TransactionRow.amount,
+            TransactionRow.currency,
             TransactionRow.kind,
             TransactionRow.category_id,
         )
@@ -117,10 +118,11 @@ class SqlTransactionRepository:
                 account_id=AccountId(account_id),
                 booking_date=booking_date,
                 amount=amount,
+                currency=currency,
                 kind=parse_literal(kind, KINDS),
                 category_id=CategoryId(category_id) if category_id is not None else None,
             )
-            for account_id, booking_date, amount, kind, category_id in self.db.execute(stmt)
+            for account_id, booking_date, amount, currency, kind, category_id in self.db.execute(stmt)
         ]
 
     def pop_pending(self, account_id: AccountId) -> list[Transaction]:

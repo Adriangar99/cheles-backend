@@ -33,6 +33,7 @@ class SummaryOut(BaseModel):
     saved: JsonDecimal
     by_category: list[CategorySpendingOut]
     balances: dict[str, JsonDecimal]  # by account role, plus "total"
+    other_currencies: list[str]  # left out of every figure (only euros are counted)
 
 
 class MonthTotalsOut(BaseModel):
@@ -72,6 +73,7 @@ def summary(
         "saved": figures.saved,
         "by_category": by_category,
         "balances": result.balances,
+        "other_currencies": result.other_currencies,
     }
 
 
