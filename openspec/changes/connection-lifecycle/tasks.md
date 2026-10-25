@@ -12,11 +12,11 @@ TDD: write the scenario test first and see it fail for the right reason. Commit 
 
 ## 3. Pending authorizations
 
-- [ ] 3.1 Tests for «Old pending authorization» and «Recent pending authorization» (time-machine), then add `created_at` to the domain and the cleanup in `StartAuthorization`; verify
+- [x] 3.1 Tests for «Old pending authorization» and «Recent pending authorization» (time-machine), then add `created_at` to the domain and the cleanup in `StartAuthorization`; verify
 
 ## 4. Verification
 
-- [ ] 4.1 Regenerate `openapi.json`; ruff, mypy, import-linter, full suite with coverage ≥ 97, spec-coverage meta-test; open the PR and verify CI
+- [x] 4.1 Regenerate `openapi.json`; ruff, mypy, import-linter, full suite with coverage ≥ 97, spec-coverage meta-test; open the PR and verify CI
 
 ## Workflow follow-up
 

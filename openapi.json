@@ -302,6 +302,10 @@
             "title": "Bank",
             "type": "string"
           },
+          "country": {
+            "title": "Country",
+            "type": "string"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -347,6 +351,7 @@
         "required": [
           "id",
           "bank",
+          "country",
           "status",
           "valid_until",
           "last_synced_at",
@@ -1037,6 +1042,38 @@
           }
         },
         "summary": "Connect Bank"
+      }
+    },
+    "/api/banks/{connection_id}": {
+      "delete": {
+        "operationId": "remove_connection_api_banks__connection_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "title": "Connection Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Connection"
       }
     },
     "/api/banks/{connection_id}/sync": {
