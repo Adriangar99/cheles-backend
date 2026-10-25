@@ -1,5 +1,7 @@
 """Characterization of `transactions/reprocessing`."""
 
+from decimal import Decimal
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -11,7 +13,7 @@ from app.categorization.infrastructure.orm import CategoryRow as Category
 from app.db import SessionLocal
 from app.transactions.infrastructure.orm import TransactionRow as Transaction
 from tests.fakes import FakeAccount, FakeEnableBanking
-from tests.helpers import connect_bank, login, raw_tx
+from tests.helpers import connect_bank, login, raw_tx, stored_row
 
 SAVINGS_IBAN = "ES2222222222222222222222"
 
@@ -58,7 +60,7 @@ def test_normalized_fields_are_recomputed_from_raw(client: TestClient, db: Sessi
     """Normalized fields come back from `raw` (part of «Reprocessing from the original payload»)."""
     transaction = by_reference(db, "groceries")
     transaction.description = "edited by hand in the database"
-    transaction.amount = 0  # type: ignore[assignment]
+    transaction.amount = Decimal("0")
     db.commit()
 
     client.post("/api/reprocess")
@@ -76,9 +78,7 @@ def test_the_external_id_is_kept(client: TestClient, db: Session) -> None:
     db.commit()
 
     client.post("/api/reprocess")
-
-    db.expire_all()
-    assert db.get(Transaction, transaction.id).external_id == "ref:groceries"  # type: ignore[union-attr]
+    assert stored_row(db, Transaction, transaction.id).external_id == "ref:groceries"
 
 
 @pytest.mark.usefixtures("stored")

@@ -12,7 +12,7 @@ TDD: write the scenario test first and see it fail; refactors keep every test gr
 
 ## 3. Tests
 
-- [ ] 3.1 Add `tests/helpers.stored()` and remove every `type: ignore` from the tests (typed values for the two non-optional cases); verify mypy and the full suite pass with coverage ≥ 97, and CI on the PR
+- [x] 3.1 Add `tests/helpers.stored()` and remove every `type: ignore` from the tests (typed values for the two non-optional cases); verify mypy and the full suite pass with coverage ≥ 97, and CI on the PR
 
 ## Workflow follow-up
 

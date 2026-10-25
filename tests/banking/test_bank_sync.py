@@ -19,7 +19,7 @@ from app.bootstrap import Container
 from app.categorization.infrastructure.orm import CategoryRow
 from app.transactions.infrastructure.orm import TransactionRow as Transaction
 from tests.fakes import FakeAccount, FakeEnableBanking
-from tests.helpers import balance, connect_bank, login, raw_tx
+from tests.helpers import balance, connect_bank, login, raw_tx, stored_row
 
 TODAY = datetime(2026, 10, 23, 12, 0, tzinfo=UTC)
 
@@ -104,7 +104,7 @@ def test_scheduled_sync_failures_are_logged(
 def test_inactive_connections(client: TestClient, db: Session, fake_bank: FakeEnableBanking, status: str) -> None:
     """Scenario: Inactive connections"""
     connection_id = connect_bank(client, fake_bank, [FakeAccount(uid="u1")])
-    db.get(BankConnection, connection_id).status = status  # type: ignore[union-attr]
+    stored_row(db, BankConnection, connection_id).status = status
     db.commit()
     fake_bank.calls.clear()
 
@@ -137,7 +137,7 @@ def test_sync_everything(client: TestClient, db: Session, fake_bank: FakeEnableB
     connect_bank(client, fake_bank, [FakeAccount(uid="a")], code="c1")
     connect_bank(client, fake_bank, [FakeAccount(uid="b")], code="c2")
     expired = connect_bank(client, fake_bank, [FakeAccount(uid="c")], code="c3")
-    db.get(BankConnection, expired).status = "expired"  # type: ignore[union-attr]
+    stored_row(db, BankConnection, expired).status = "expired"
     db.commit()
     fake_bank.transactions.update(
         {

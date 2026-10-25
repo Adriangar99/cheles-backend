@@ -1,12 +1,27 @@
 """Unit tests for re-linking known accounts when a bank is reconnected (pure domain)."""
 
-from app.banking.domain.account import Account, Iban
+from app.banking.domain.account import Account, AccountRole, Iban
 from app.banking.domain.reconnection import IncomingAccount, link_account
+from app.shared.ids import AccountId
 
 
-def known(**fields: object) -> Account:
-    defaults: dict[str, object] = {"name": "Cuenta", "currency": "EUR"}
-    return Account(**{**defaults, **fields})  # type: ignore[arg-type]
+def known(
+    *,
+    id: int,
+    iban: Iban | None = None,
+    identification_hash: str | None = None,
+    role: AccountRole = "main",
+    alias: str | None = None,
+) -> Account:
+    """An account already stored from a previous connection."""
+    return Account(
+        name="Cuenta",
+        id=AccountId(id),
+        iban=iban,
+        identification_hash=identification_hash,
+        role=role,
+        alias=alias,
+    )
 
 
 def test_matches_by_identification_hash_first() -> None:
