@@ -1,119 +1,39 @@
 # Cheles · backend
 
-Cheles API (working name): FastAPI + Postgres. Password + TOTP login, sync with Enable Banking and statistics. The
-frontend lives in [cheles-frontend](https://github.com/Adriangar99/cheles-frontend).
+Personal finance API for a single user: it reads your bank accounts through [Enable Banking](https://enablebanking.com),
+categorizes every transaction, tells transfers between your own accounts apart from real spending, and computes your
+monthly figures. FastAPI + Postgres, run with Docker Compose on your Mac. The web app is
+[cheles-frontend](https://github.com/Adriangar99/cheles-frontend).
 
-Transactions are stored exactly as the bank returns them (`raw`), so they can be reprocessed without fetching them
-again.
+- Password + authenticator-app login, single user, nothing published outside the Docker network.
+- Bank connections with 180-day consents, automatic sync twice a day, balances.
+- Transactions stored exactly as the bank sends them, so they can be reprocessed; rules, manual categories, notes and
+  transfer marks that survive every sync.
+- Monthly income, expenses, savings and spending by category, in euros.
 
-## Getting started
+## Quick start
 
-    cp .env.example .env                 # and fill in DB_PASSWORD, EB_APPLICATION_ID…
-    docker compose up -d --build
+    cp .env.example .env                                                   # fill in DB_PASSWORD and EB_APPLICATION_ID
+    docker compose up -d --build                                           # Postgres + API (no published ports)
     docker compose run --rm api python -m app.cli create-user <username>   # password + 2FA QR code
 
-The API publishes no ports: it is only exposed to the web app through the Docker network `cheles-net`, which this
-compose file creates (alias `api`, port 8000). **Always start the backend first**, then the frontend.
+Then start the [web app](https://github.com/Adriangar99/cheles-frontend). Enable Banking needs a key pair and an
+application first: see [setup](docs/setup.md).
 
-Both repos share the Compose project name `cheles`, so `api`, `db` and `web` show up together. Never run
-`docker compose down --remove-orphans` from one repo: it would also remove the other repo's containers.
+## Documentation
 
-## Architecture
+| Document | Contents |
+| --- | --- |
+| [Setup](docs/setup.md) | Settings, Enable Banking key pair and application, first start, the user |
+| [Features](docs/features.md) | What the API does, by bounded context, with links to the specs |
+| [Architecture](docs/architecture.md) | Bounded contexts, hexagonal layers, ports, events, enforced boundaries |
+| [Development](docs/development.md) | Commands, tests, API contract, migrations, workflow |
+| [Operations](docs/operations.md) | Sync, logs, backups, updating, troubleshooting |
 
-DDD with a hexagonal architecture per bounded context: `identity` (the reference), `categorization`, `transactions`,
-`banking` and `stats`. `app/main.py` is only the composition edge: app creation, startup (catalog seeding, scheduled
-sync), `/api/health` and `POST /api/rules`, a flow orchestrated across categorization and transactions.
-
-    app/identity/
-      domain/           # entities, value objects and rules; plain Python, no frameworks
-      application/      # use cases and the ports (Protocols) they depend on
-      infrastructure/   # adapters: SQLAlchemy rows and repositories, argon2/pyotp, FastAPI router, CLI
-      public.py         # the only part of the context the rest of the app may import
-    app/shared/         # shared kernel: Money, YearMonth, typed ids, event bus (only what means the same everywhere)
-    app/bootstrap.py    # composition root: builds adapters, binds use cases, wires FastAPI dependencies and events
-    app/orm_registry.py # every context's ORM rows, for Alembic
-
-- Domain entities are dataclasses; ORM rows live in `infrastructure/orm.py` and repositories translate between them.
-- FastAPI routes depend on placeholder providers that `bootstrap.wire(app, container)` overrides, so tests can wire
-  their own `Container` (e.g. with a fake clock or the fake Enable Banking provider).
-- Contexts never import each other's internals. When a context needs data it does not own (own IBANs,
-  account names, category suggestions, where to store synced transactions) it declares a port, and the composition
-  root plugs in an adapter over the owner's public API.
-- Cross-context flows that must answer the caller are orchestrated explicitly at the edge (e.g. `POST /api/rules`
-  creates the rule in categorization, then reprocesses in transactions).
-- Reactions that do not answer the caller go through the in-memory event bus (`app/shared/events.py`): publishers
-  publish after their unit of work commits, handlers run synchronously in their own transaction, and a failing
-  handler is logged without undoing the publisher's change. Subscriptions are wired in `bootstrap.Container`
-  (today: `AccountIbanChanged` → transactions reprocess).
-- Stats owns no tables: it reads the read models other contexts publish (transactions' movement records, banking's
-  account snapshots, categorization's labels) through its own ports and aggregates them in its pure domain. A
-  stats-owned projection could replace those adapters without touching the domain.
-- `wire()` keeps the container in `app.state.container`, which only the composition edge (`app/main.py`) reads.
-- `uv run lint-imports` enforces the rules (see `[tool.importlinter]` in `pyproject.toml`): layers only depend
-  downwards, domain and application import no frameworks, and both the composition edge and other contexts reach a
-  context only through its `public.py` (the composition root `app/bootstrap.py` is the only module that wires
-  internals).
-
-## Development
-
-Requires [uv](https://docs.astral.sh/uv/) and Docker (the tests start a throwaway Postgres with testcontainers).
-
-    uv sync                              # Python 3.12 + runtime and dev dependencies from uv.lock
-    uv run pytest --cov                  # tests + coverage (fails below the ratchet in pyproject.toml)
-    uv run ruff check . && uv run ruff format --check .
-    uv run mypy                          # strict, over app/, migrations/ and tests/
-    uv run lint-imports                  # architecture contracts (pyproject.toml, [tool.importlinter])
-
-CI (GitHub Actions) runs the same checks on every pull request and on `main`.
-
-Every scenario in `openspec/specs/` has a test whose docstring quotes it (`tests/<context>/test_<capability>.py`);
-`tests/test_spec_coverage.py` fails when one is missing.
-
-### API contract
-
-`openapi.json` (versioned) is the API contract: every JSON route declares a response model, and cheles-frontend
-generates its TypeScript types from a copy of this file. After changing a route, regenerate and commit it (any
-`DATABASE_URL` value works; no connection is made):
-
-    DATABASE_URL=postgresql+psycopg://unused@localhost/unused uv run python -m app.cli openapi
-
-`tests/platform/test_api_contract.py` fails while the file is out of date. Response models use the field types in
-`app/http_types.py` so amounts stay JSON numbers and datetimes keep their `+00:00` offset.
-
-### Database and migrations
-
-`DATABASE_URL` is required (Docker Compose builds it from `DB_PASSWORD`). The schema is managed with Alembic: the
-container runs `python -m app.cli migrate` before starting the API, which also adopts a database created before
-migrations existed.
-
-    export DATABASE_URL=postgresql+psycopg://cheles:<password>@localhost:5432/cheles   # a database at the latest revision
-    uv run alembic revision --autogenerate -m "describe the change"                     # review the generated file
-    uv run python -m app.cli migrate                                                    # apply it
-
-## Enable Banking setup (once)
-
-1. Go to https://enablebanking.com/cp/applications and create an application.
-2. Upload `secrets/eb_certificate.pem`; the private key `secrets/eb_private_key.pem` never leaves your Mac.
-3. Redirect URL: `http://localhost:3000/api/banks/callback` (must match `PUBLIC_URL` in `.env`).
-4. Copy the **Application ID** into `EB_APPLICATION_ID` in `.env` and restart: `docker compose up -d`.
-5. Restricted mode (free): link your own accounts from the dashboard.
-
-## Account roles
-
-`main` (day to day: salary and payments), `savings`, `excluded` (does not count). Transfers between your own accounts
-(detected by IBAN) count as neither expense nor income. Any transaction can be marked by hand with ⇄.
+Behavior is specified in [`openspec/specs/`](openspec/specs/), grouped by bounded context.
 
 ## Security
 
-Neither the API nor the database is published; the database sits on an internal network the web app cannot see.
-Session via `HttpOnly` cookie; at most 5 login attempts per IP; `secrets/` and `.env` are kept out of git.
-
-## Language
-
-Code, specs and documentation are written in English. The app's user-facing copy is Spanish (Spain).
-
-## Development with OpenSpec
-
-Changes are planned with [OpenSpec](https://github.com/Fission-AI/OpenSpec) (`openspec/`), using the Claude Code
-commands `/opsx:explore`, `/opsx:propose`, `/opsx:update`, `/opsx:apply`, `/opsx:sync` and `/opsx:archive`. Current
-behavior is specified under `openspec/specs/`, grouped by bounded context.
+Neither the API nor the database is published; the database sits on an internal network the web app cannot see. The
+session is an `HttpOnly` cookie; at most 5 failed logins per IP in 15 minutes. `.env`, `secrets/` and `backups/` are
+never committed, and the Enable Banking private key never leaves your Mac.
