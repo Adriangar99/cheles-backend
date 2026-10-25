@@ -374,6 +374,169 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "ImportIn": {
+        "properties": {
+          "accounts": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "const": "new",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Accounts",
+            "type": "object"
+          },
+          "file": {
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file",
+          "accounts"
+        ],
+        "title": "ImportIn",
+        "type": "object"
+      },
+      "ImportPreviewOut": {
+        "properties": {
+          "unmatched_categories": {
+            "items": {
+              "$ref": "#/components/schemas/UnmatchedCategoryOut"
+            },
+            "title": "Unmatched Categories",
+            "type": "array"
+          },
+          "wallets": {
+            "items": {
+              "$ref": "#/components/schemas/ImportWalletOut"
+            },
+            "title": "Wallets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "wallets",
+          "unmatched_categories"
+        ],
+        "title": "ImportPreviewOut",
+        "type": "object"
+      },
+      "ImportResultOut": {
+        "properties": {
+          "adjustments": {
+            "title": "Adjustments",
+            "type": "integer"
+          },
+          "already_imported": {
+            "title": "Already Imported",
+            "type": "integer"
+          },
+          "imported": {
+            "title": "Imported",
+            "type": "integer"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "imported",
+          "skipped",
+          "already_imported",
+          "adjustments"
+        ],
+        "title": "ImportResultOut",
+        "type": "object"
+      },
+      "ImportWalletOut": {
+        "properties": {
+          "adjustments": {
+            "title": "Adjustments",
+            "type": "integer"
+          },
+          "already_imported": {
+            "title": "Already Imported",
+            "type": "integer"
+          },
+          "bank_since": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bank Since"
+          },
+          "first_date": {
+            "format": "date",
+            "title": "First Date",
+            "type": "string"
+          },
+          "last_date": {
+            "format": "date",
+            "title": "Last Date",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "rows": {
+            "title": "Rows",
+            "type": "integer"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "const": "new",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          },
+          "to_import": {
+            "title": "To Import",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "rows",
+          "first_date",
+          "last_date",
+          "target",
+          "to_import",
+          "skipped",
+          "bank_since",
+          "already_imported",
+          "adjustments"
+        ],
+        "title": "ImportWalletOut",
+        "type": "object"
+      },
       "LoginBody": {
         "properties": {
           "code": {
@@ -732,6 +895,24 @@
           }
         },
         "title": "TxPatch",
+        "type": "object"
+      },
+      "UnmatchedCategoryOut": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "rows": {
+            "title": "Rows",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "rows"
+        ],
+        "title": "UnmatchedCategoryOut",
         "type": "object"
       },
       "ValidationError": {
@@ -1161,6 +1342,82 @@
           }
         },
         "summary": "Health"
+      }
+    },
+    "/api/imports": {
+      "post": {
+        "operationId": "run_import_api_imports_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResultOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Import"
+      }
+    },
+    "/api/imports/preview": {
+      "post": {
+        "operationId": "preview_import_api_imports_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportPreviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Import"
       }
     },
     "/api/reprocess": {
