@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
@@ -12,8 +13,10 @@ from app.transactions.application.ports import (
     SearchCriteria,
     UnitOfWork,
 )
-from app.transactions.domain.errors import TransactionNotFound, UnknownCategory
+from app.transactions.domain.errors import TransactionNotFound, UndatedTransaction, UnknownCategory
 from app.transactions.domain.transaction import Transaction
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -46,7 +49,12 @@ class Ingest:
             suggester = self.suggestions.load()
             created = 0
             for raw in raws:
-                incoming = Transaction.from_payload(account_id, raw)
+                try:
+                    incoming = Transaction.from_payload(account_id, raw)
+                except UndatedTransaction:
+                    reference = raw.get("entry_reference") or raw.get("transaction_id") or "sin referencia"
+                    log.warning("Movimiento sin fecha ignorado (%s)", reference)
+                    continue
                 transaction = self.uow.transactions.by_external_id(account_id, incoming.external_id)
                 if transaction is None:
                     transaction = incoming

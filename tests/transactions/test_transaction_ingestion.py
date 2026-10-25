@@ -133,6 +133,18 @@ def test_no_booking_date(ingest: Any) -> None:
     assert transaction.booking_date.isoformat() == "2026-10-05"
 
 
+def test_no_date_at_all(ingest: Any, client: TestClient, caplog: pytest.LogCaptureFixture) -> None:
+    """Scenario: No date at all"""
+    undated = raw_tx("8.00", reference="undated", booking_date=None)
+
+    rows = ingest(raw_tx("3.00", reference="dated"), undated)
+
+    assert [t.external_id for t in rows] == ["ref:dated"]
+    assert "undated" in caplog.text
+    [connection] = client.get("/api/banks").json()["connections"]
+    assert client.post(f"/api/banks/{connection['id']}/sync").status_code == 200
+
+
 def test_pending_transaction(ingest: Any) -> None:
     """Scenario: Pending transaction"""
     [pending, default] = ingest(
