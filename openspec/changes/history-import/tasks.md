@@ -9,7 +9,7 @@ invented (never the owner's export); the real export is only used for a final ma
 
 ## 2. Reader
 
-- [ ] 2.1 `moneylover.py`: encodings, columns in any order, dates and amounts, quoted fields, line-numbered errors, stable ids with the identical-row counter («UTF-16 export», «Not a MoneyLover export», «Unreadable row», «Identical rows»)
+- [x] 2.1 `moneylover.py`: encodings, columns in any order, dates and amounts, quoted fields, line-numbered errors, stable ids with the identical-row counter («UTF-16 export», «Not a MoneyLover export», «Unreadable row», «Identical rows»)
 
 ## 3. Plan and import
 
