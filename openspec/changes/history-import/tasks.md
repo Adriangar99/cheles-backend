@@ -5,7 +5,7 @@ invented (never the owner's export); the real export is only used for a final ma
 
 ## 1. Model
 
-- [ ] 1.1 `source` on Transaction (`bank` | `import`) with migration `0003_transaction_source`; reprocessing keeps imported transactions as imported («Imported transaction»)
+- [x] 1.1 `source` on Transaction (`bank` | `import`) with migration `0003_transaction_source`; reprocessing keeps imported transactions as imported («Imported transaction»)
 
 ## 2. Reader
 
