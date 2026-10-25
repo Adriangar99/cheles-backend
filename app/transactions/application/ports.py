@@ -30,6 +30,7 @@ class MovementRecord:
     account_id: AccountId
     booking_date: date
     amount: Decimal  # signed: negative means money going out
+    currency: str
     kind: Literal["normal", "transfer"]
     category_id: CategoryId | None
 
@@ -51,7 +52,9 @@ class TransactionRepository(Protocol):
         """Movements with `start <= booking_date < end` (either bound optional)."""
         ...
 
-    def delete_pending(self, account_id: AccountId) -> None: ...
+    def pop_pending(self, account_id: AccountId) -> list[Transaction]:
+        """Deletes the account's pending transactions and returns them."""
+        ...
 
     def save(self, transaction: Transaction) -> None:
         """Inserts a new transaction (setting its `id`) or updates an existing one."""

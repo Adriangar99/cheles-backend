@@ -11,6 +11,8 @@ from app.shared.ids import AccountId, CategoryId
 from app.shared.year_month import YearMonth
 
 ZERO = Decimal(0)
+# Figures never mix currencies: only this one is counted, anything else is reported as left out
+BASE_CURRENCY = "EUR"
 
 
 @dataclass(frozen=True)
@@ -20,6 +22,7 @@ class Movement:
     account_id: AccountId
     booking_date: date
     amount: Decimal  # signed: negative means money going out
+    currency: str
     kind: Literal["normal", "transfer"]
     category_id: CategoryId | None
 
@@ -32,6 +35,7 @@ class AccountStanding:
     counts: bool
     is_savings: bool
     balance_group: str
+    currency: str
     balance: Decimal | None
 
 
@@ -75,7 +79,11 @@ def _month_of(movement: Movement) -> YearMonth:
 
 
 def counted(movements: Iterable[Movement], standings: Sequence[AccountStanding]) -> list[Movement]:
-    """Real income and expenses: not transfers between own accounts, and not from excluded accounts."""
+    """Real income and expenses: in euros, not transfers between own accounts, and not from excluded accounts."""
+    return [m for m in _would_count(movements, standings) if m.currency == BASE_CURRENCY]
+
+
+def _would_count(movements: Iterable[Movement], standings: Sequence[AccountStanding]) -> list[Movement]:
     counting = {s.account_id for s in standings if s.counts}
     return [m for m in movements if m.kind == "normal" and m.account_id in counting]
 
@@ -90,7 +98,14 @@ def month_figures(
 
     # Savings: what goes into savings accounts minus what leaves them (own-account transfers)
     savings = {s.account_id for s in standings if s.is_savings}
-    saved = sum((m.amount for m in in_month if m.kind == "transfer" and m.account_id in savings), ZERO)
+    saved = sum(
+        (
+            m.amount
+            for m in in_month
+            if m.kind == "transfer" and m.account_id in savings and m.currency == BASE_CURRENCY
+        ),
+        ZERO,
+    )
 
     by_category: dict[CategoryId | None, Decimal] = defaultdict(lambda: ZERO)
     for m in real:
@@ -126,6 +141,16 @@ def balances_by_role(standings: Sequence[AccountStanding]) -> dict[str, Decimal]
     """Last known balance per balance group (missing balances as 0), excluded accounts left out, plus the total."""
     totals: dict[str, Decimal] = {}
     for s in standings:
-        if s.counts:
+        if s.counts and s.currency == BASE_CURRENCY:
             totals[s.balance_group] = totals.get(s.balance_group, ZERO) + (s.balance or ZERO)
     return {**totals, "total": sum(totals.values(), ZERO)}
+
+
+def other_currencies(
+    month: YearMonth, movements: Iterable[Movement], standings: Sequence[AccountStanding]
+) -> list[str]:
+    """Currencies left out of the month's figures and balances: of movements and balances that would count otherwise."""
+    in_month = [m for m in movements if month.start <= m.booking_date < month.end]
+    found = {m.currency for m in _would_count(in_month, standings)}
+    found |= {s.currency for s in standings if s.counts and s.balance is not None}
+    return sorted(found - {BASE_CURRENCY})

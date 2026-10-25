@@ -76,6 +76,14 @@ class Transaction:
                 else suggester.categorize(self.counterparty, self.description, is_income=self.amount.amount > 0)
             )
 
+    def inherit_edits(self, replaced: "Transaction") -> None:
+        """Takes the manual edits of the pending transaction this one replaces (manual category, note, manual kind)."""
+        if replaced.category_manual:
+            self.category_id, self.category_manual = replaced.category_id, True
+        self.note = replaced.note
+        if replaced.kind_manual:
+            self.kind, self.kind_manual = replaced.kind, True
+
     def set_kind(self, kind: Kind, own_ibans: Collection[str], suggester: CategorySuggester) -> None:
         """Sets the kind by hand (⇄). It is only stored as manual when it differs from the automatic one, so asking
         for the automatic kind removes the manual mark."""

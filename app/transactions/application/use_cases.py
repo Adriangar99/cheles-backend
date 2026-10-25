@@ -14,6 +14,7 @@ from app.transactions.application.ports import (
     UnitOfWork,
 )
 from app.transactions.domain.errors import TransactionNotFound, UndatedTransaction, UnknownCategory
+from app.transactions.domain.pending import matching_pending
 from app.transactions.domain.transaction import Transaction
 
 log = logging.getLogger(__name__)
@@ -43,8 +44,9 @@ class Ingest:
 
     def __call__(self, account_id: AccountId, raws: Sequence[dict[str, Any]]) -> int:
         with self.uow:
-            # Pending transactions change their id once booked: drop them, the bank sends them again
-            self.uow.transactions.delete_pending(account_id)
+            # Pending transactions change their id once booked: drop them (the bank sends them again), but keep them
+            # at hand so the transaction that replaces each one inherits its manual edits
+            removed_pending = self.uow.transactions.pop_pending(account_id)
             ibans = self.own_accounts.ibans()
             suggester = self.suggestions.load()
             created = 0
@@ -59,6 +61,10 @@ class Ingest:
                 if transaction is None:
                     transaction = incoming
                     created += 1
+                    replaced = matching_pending(incoming, removed_pending)
+                    if replaced is not None:
+                        transaction.inherit_edits(replaced)
+                        removed_pending.remove(replaced)
                 else:
                     transaction.refresh_from(raw)
                 transaction.derive(ibans, suggester)

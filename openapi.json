@@ -509,6 +509,13 @@
             "title": "Net",
             "type": "number"
           },
+          "other_currencies": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Other Currencies",
+            "type": "array"
+          },
           "saved": {
             "title": "Saved",
             "type": "number"
@@ -521,7 +528,8 @@
           "net",
           "saved",
           "by_category",
-          "balances"
+          "balances",
+          "other_currencies"
         ],
         "title": "SummaryOut",
         "type": "object"

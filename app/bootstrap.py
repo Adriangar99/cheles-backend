@@ -207,7 +207,7 @@ class _TransactionsMovements:
 
     def between(self, start: date | None, end: date | None) -> list[Movement]:
         return [
-            Movement(r.account_id, r.booking_date, r.amount, r.kind, r.category_id)
+            Movement(r.account_id, r.booking_date, r.amount, r.currency, r.kind, r.category_id)
             for r in self.container.transactions().list_movements(start, end)
         ]
 
@@ -225,6 +225,7 @@ class _BankingStandings:
                 counts=s.role != "excluded",
                 is_savings=s.role == "savings",
                 balance_group=s.role,
+                currency=s.currency,
                 balance=s.balance,
             )
             for s in self.container.banking().account_snapshots()

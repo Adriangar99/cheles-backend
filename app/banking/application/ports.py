@@ -18,6 +18,7 @@ class AccountSnapshot:
 
     account_id: AccountId
     role: AccountRole
+    currency: str
     balance: Decimal | None
 
 

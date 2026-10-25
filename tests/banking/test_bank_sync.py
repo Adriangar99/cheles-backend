@@ -17,6 +17,7 @@ from app.banking.infrastructure.orm import AccountRow as Account
 from app.banking.infrastructure.orm import BankConnectionRow as BankConnection
 from app.bootstrap import Container
 from app.categorization.infrastructure.orm import CategoryRow
+from app.categorization.infrastructure.orm import CategoryRow as Category
 from app.transactions.infrastructure.orm import TransactionRow as Transaction
 from tests.fakes import FakeAccount, FakeEnableBanking
 from tests.helpers import balance, connect_bank, login, raw_tx, stored_row
@@ -316,7 +317,77 @@ def test_pending_transaction_is_still_pending(client: TestClient, db: Session, f
     db.expire_all()
     [again] = db.scalars(select(Transaction)).all()
     assert again.id != pending_id
-    assert (again.external_id, again.status, again.note) == ("id:pending-1", "PDNG", None)
+    assert (again.external_id, again.status, again.note) == ("id:pending-1", "PDNG", "cena")
+
+
+def category_id(db: Session, name: str) -> int:
+    found: int = db.scalars(select(Category.id).where(Category.name == name)).one()
+    return found
+
+
+@pytest.mark.usefixtures("user")
+def test_edits_survive_booking(client: TestClient, db: Session, fake_bank: FakeEnableBanking) -> None:
+    """Scenario: Edits survive booking"""
+    fake_bank.transactions["u1"] = [
+        raw_tx("12.50", transaction_id="p1", status="PDNG", booking_date="2026-10-03", creditor="MERCADONA")
+    ]
+    connection_id = connect_bank(client, fake_bank, [FakeAccount(uid="u1")])
+    pending_id = db.scalars(select(Transaction.id)).one()
+    restaurants = category_id(db, "Restaurantes")
+    client.patch(
+        f"/api/transactions/{pending_id}", json={"category_id": restaurants, "note": "cena", "kind": "transfer"}
+    )
+    fake_bank.transactions["u1"] = [
+        raw_tx("12.50", reference="b1", status="BOOK", booking_date="2026-10-05", creditor="MERCADONA")
+    ]
+
+    sync(client, connection_id)
+
+    db.expire_all()
+    [booked] = db.scalars(select(Transaction)).all()
+    assert (booked.external_id, booked.status) == ("ref:b1", "BOOK")
+    assert (booked.category_id, booked.category_manual, booked.note) == (restaurants, True, "cena")
+    assert (booked.kind, booked.kind_manual) == ("transfer", True)
+
+
+@pytest.mark.usefixtures("user")
+def test_no_matching_booked_transaction(client: TestClient, db: Session, fake_bank: FakeEnableBanking) -> None:
+    """Scenario: No matching booked transaction"""
+    fake_bank.transactions["u1"] = [
+        raw_tx("12.50", transaction_id="p1", status="PDNG", booking_date="2026-10-03", creditor="MERCADONA")
+    ]
+    connection_id = connect_bank(client, fake_bank, [FakeAccount(uid="u1")])
+    client.patch(f"/api/transactions/{db.scalars(select(Transaction.id)).one()}", json={"note": "cena"})
+    fake_bank.transactions["u1"] = [
+        raw_tx("30.00", reference="b1", status="BOOK", booking_date="2026-10-05", creditor="MERCADONA")
+    ]
+
+    sync(client, connection_id)
+
+    db.expire_all()
+    [other] = db.scalars(select(Transaction)).all()
+    assert (other.external_id, other.note, other.category_manual) == ("ref:b1", None, False)
+
+
+# Requirement detail not covered by a scenario: a pending transaction passes its edits on at most once.
+@pytest.mark.usefixtures("user")
+def test_a_pending_transaction_passes_its_edits_on_once(
+    client: TestClient, db: Session, fake_bank: FakeEnableBanking
+) -> None:
+    fake_bank.transactions["u1"] = [
+        raw_tx("12.50", transaction_id="p1", status="PDNG", booking_date="2026-10-03", creditor="MERCADONA")
+    ]
+    connection_id = connect_bank(client, fake_bank, [FakeAccount(uid="u1")])
+    client.patch(f"/api/transactions/{db.scalars(select(Transaction.id)).one()}", json={"note": "cena"})
+    fake_bank.transactions["u1"] = [
+        raw_tx("12.50", reference=f"b{n}", status="BOOK", booking_date="2026-10-04", creditor="MERCADONA")
+        for n in (1, 2)
+    ]
+
+    sync(client, connection_id)
+
+    db.expire_all()
+    assert sorted(str(t.note) for t in db.scalars(select(Transaction))) == ["None", "cena"]
 
 
 # ---------- Account balance ----------
