@@ -2,7 +2,7 @@
 
 from app.categorization.application.use_cases import CategorizationServices
 from app.categorization.domain.category import CategoryLabel
-from app.categorization.domain.errors import UnknownCategory
+from app.categorization.domain.errors import EmptyRulePattern, UnknownCategory
 from app.categorization.domain.policy import CategorizationPolicy
 
-__all__ = ["CategorizationPolicy", "CategorizationServices", "CategoryLabel", "UnknownCategory"]
+__all__ = ["CategorizationPolicy", "CategorizationServices", "CategoryLabel", "EmptyRulePattern", "UnknownCategory"]

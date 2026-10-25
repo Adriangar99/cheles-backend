@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from app.categorization.application.ports import UnitOfWork
 from app.categorization.domain.catalog import DEFAULT_CATALOG
 from app.categorization.domain.category import Category, CategoryLabel
-from app.categorization.domain.errors import UnknownCategory
+from app.categorization.domain.errors import EmptyRulePattern, UnknownCategory
 from app.categorization.domain.policy import CategorizationPolicy
 from app.categorization.domain.rule import DEFAULT_RULE_PRIORITY, USER_RULE_PRIORITY, Rule
 from app.shared.ids import CategoryId, saved_id
@@ -43,6 +43,8 @@ class CreateRule:
     uow: UnitOfWork
 
     def __call__(self, pattern: str, category_id: CategoryId) -> Rule:
+        if not pattern.strip():
+            raise EmptyRulePattern()
         with self.uow:
             if not self.uow.categories.exists(category_id):
                 raise UnknownCategory()

@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
 import app.main
@@ -202,3 +202,23 @@ def test_unknown_category(client: TestClient, db: Session) -> None:
     assert response.status_code == 400
     assert response.json() == {"detail": "Categoría inexistente"}
     assert len(db.scalars(select(Rule)).all()) == rules_before
+
+
+def test_empty_pattern(client: TestClient, db: Session, fake_bank: FakeEnableBanking) -> None:
+    """Scenario: Empty pattern"""
+    login(client, db)
+    fake_bank.transactions["u1"] = [raw_tx("12.50", reference="r1", creditor="MERCADONA")]
+    connect_bank(client, fake_bank, [FakeAccount(uid="u1")])
+    # A category a reprocess would overwrite, so a reprocess would show
+    leisure = db.scalars(select(Category.id).where(Category.name == "Ocio")).one()
+    db.execute(update(Transaction).values(category_id=leisure))
+    db.commit()
+    rules_before = len(db.scalars(select(Rule)).all())
+
+    response = client.post("/api/rules", json={"pattern": "   ", "category_id": leisure})
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "El patrón no puede estar vacío"}
+    assert len(db.scalars(select(Rule)).all()) == rules_before
+    db.expire_all()
+    assert db.scalars(select(Transaction.category_id)).one() == leisure
