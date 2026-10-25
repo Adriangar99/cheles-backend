@@ -8,11 +8,11 @@ TDD: write the scenario test first and see it fail for the right reason. Commit 
 
 ## 2. Rules
 
-- [ ] 2.1 Test «Empty pattern», then raise `EmptyRulePattern` in `CreateRule` and map it to 400 in `POST /api/rules`; verify the categorization tests pass
+- [x] 2.1 Test «Empty pattern», then raise `EmptyRulePattern` in `CreateRule` and map it to 400 in `POST /api/rules`; verify the categorization tests pass
 
 ## 3. Verification
 
-- [ ] 3.1 ruff, mypy, import-linter, full suite with coverage ≥ 97 and the spec-coverage meta-test; open the PR and verify CI
+- [x] 3.1 ruff, mypy, import-linter, full suite with coverage ≥ 97 and the spec-coverage meta-test; open the PR and verify CI
 
 ## Workflow follow-up
 
