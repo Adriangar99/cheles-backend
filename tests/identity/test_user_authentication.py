@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 import app.cli
 import app.main
 from app.bootstrap import Container, wire
+from app.identity.application.ports import PasswordHasher, TotpService
 from app.identity.infrastructure.orm import LoginSessionRow as LoginSession
 from app.identity.infrastructure.orm import UserRow as User
 from app.identity.infrastructure.security import SystemClock
@@ -157,6 +158,53 @@ def test_any_wrong_credential(client: TestClient, db: Session, wrong: str) -> No
 
     assert response.status_code == 401
     assert response.json() == {"detail": "Datos incorrectos"}
+
+
+class CountingHasher:
+    """The container's password hasher, counting verifications."""
+
+    def __init__(self, inner: PasswordHasher) -> None:
+        self.inner = inner
+        self.verified = 0
+
+    def hash(self, password: str) -> str:
+        return self.inner.hash(password)
+
+    def verify(self, password_hash: str | None, password: str) -> bool:
+        self.verified += 1
+        return self.inner.verify(password_hash, password)
+
+
+class CountingTotp:
+    """The container's TOTP service, counting verifications."""
+
+    def __init__(self, inner: TotpService) -> None:
+        self.inner = inner
+        self.verified = 0
+
+    def new_secret(self) -> str:
+        return self.inner.new_secret()
+
+    def provisioning_uri(self, secret: str, username: str) -> str:
+        return self.inner.provisioning_uri(secret, username)
+
+    def verify(self, secret: str | None, code: str) -> bool:
+        self.verified += 1
+        return self.inner.verify(secret, code)
+
+
+def test_same_work_for_every_failure(client: TestClient, db: Session, container: Container) -> None:
+    """Scenario: Same work for every failure"""
+    create_user(db)
+    hasher = CountingHasher(container.hasher)
+    totp = CountingTotp(container.totp)
+    container.hasher, container.totp = hasher, totp
+
+    post_login(client, "000000", username="nobody")
+    assert (hasher.verified, totp.verified) == (1, 1)
+
+    post_login(client, "000000", password="wrong password")
+    assert (hasher.verified, totp.verified) == (2, 2)
 
 
 # ---------- HttpOnly cookie session ----------

@@ -37,11 +37,11 @@ class LogIn:
             raise TooManyAttempts()
         with self.uow:
             user = self.uow.users.by_username(username)
-            if (
-                user is None
-                or user.id is None
-                or not (self.hasher.verify(user.password_hash, password) and self.totp.verify(user.totp_secret, code))
-            ):
+            # Both checks always run (the ports do the same work for an unknown user), so a failure takes the same time
+            # whatever failed: no username enumeration by timing
+            password_ok = self.hasher.verify(user.password_hash if user else None, password)
+            code_ok = self.totp.verify(user.totp_secret if user else None, code)
+            if user is None or user.id is None or not (password_ok and code_ok):
                 self.throttle.record_failure(client_key, self.clock.monotonic())
                 raise InvalidCredentials()
             self.throttle.reset(client_key)

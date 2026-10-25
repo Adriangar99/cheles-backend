@@ -51,7 +51,9 @@ class UnitOfWork(Protocol):
 class PasswordHasher(Protocol):
     def hash(self, password: str) -> str: ...
 
-    def verify(self, password_hash: str, password: str) -> bool: ...
+    def verify(self, password_hash: str | None, password: str) -> bool:
+        """Whether `password` matches; with no hash (unknown user) it does the same work and returns False."""
+        ...
 
 
 class TotpService(Protocol):
@@ -59,7 +61,9 @@ class TotpService(Protocol):
 
     def provisioning_uri(self, secret: str, username: str) -> str: ...
 
-    def verify(self, secret: str, code: str) -> bool: ...
+    def verify(self, secret: str | None, code: str) -> bool:
+        """Whether `code` is valid; with no secret (unknown user) it does the same work and returns False."""
+        ...
 
 
 class Clock(Protocol):

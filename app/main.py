@@ -10,7 +10,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel
 
 from app.bootstrap import Container, wire
-from app.categorization.public import UnknownCategory
+from app.categorization.public import EmptyRulePattern, UnknownCategory
 from app.config import get_settings
 from app.identity.public import AuthenticatedUser, require_user
 from app.shared.ids import CategoryId
@@ -66,6 +66,8 @@ def create_rule(body: RuleBody, request: Request, _: AuthenticatedUser = Depends
         container.categorization().create_rule(body.pattern, CategoryId(body.category_id))
     except UnknownCategory:
         raise HTTPException(400, "Categoría inexistente") from None
+    except EmptyRulePattern:
+        raise HTTPException(400, "El patrón no puede estar vacío") from None
     return {"processed": container.transactions().reprocess_all()}
 
 
