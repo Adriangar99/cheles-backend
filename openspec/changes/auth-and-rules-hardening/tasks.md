@@ -4,7 +4,7 @@ TDD: write the scenario test first and see it fail for the right reason. Commit 
 
 ## 1. Login
 
-- [ ] 1.1 Test «Same work for every failure» with spies on the hasher and TOTP ports, then make `Login` always verify a hash and a code (dummy hash and secret for unknown users); verify the identity tests pass and mutation-check the non-short-circuit evaluation
+- [x] 1.1 Test «Same work for every failure» with spies on the hasher and TOTP ports, then make `Login` always verify a hash and a code (dummy hash and secret for unknown users); verify the identity tests pass and mutation-check the non-short-circuit evaluation
 
 ## 2. Rules
 
