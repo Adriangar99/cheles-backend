@@ -158,6 +158,19 @@ def bank_callback(
     return Response(status_code=303, headers={"Location": f"/bancos?{'connected=1' if connected else 'error=1'}"})
 
 
+@router.delete("/api/banks/{connection_id}", status_code=204, response_class=Response)
+def remove_connection(
+    connection_id: int,
+    services: BankingServices = Depends(banking_services),
+    _: AuthenticatedUser = Depends(require_user),
+) -> Response:
+    try:
+        services.remove_connection(connection_id)
+    except ConnectionNotFound:
+        raise HTTPException(404) from None
+    return Response(status_code=204)
+
+
 @router.post("/api/banks/{connection_id}/sync", response_model=SyncOut)
 def sync_one(
     connection_id: int,

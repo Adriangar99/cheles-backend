@@ -21,6 +21,7 @@ from app.banking.application.use_cases import (
     ListAvailableBanks,
     ListConnections,
     OwnAccountIbans,
+    RemoveConnection,
     StartAuthorization,
     SyncAll,
     SyncConnection,
@@ -172,6 +173,7 @@ class Container:
         )
         return BankingServices(
             list_connections=ListConnections(uow=uow),
+            remove_connection=RemoveConnection(uow=uow, provider=self.banking_provider),
             list_available_banks=ListAvailableBanks(provider=self.banking_provider, settings=settings),
             start_authorization=StartAuthorization(
                 uow=uow, provider=self.banking_provider, settings=settings, clock=clock, states=_UrlSafeStates()

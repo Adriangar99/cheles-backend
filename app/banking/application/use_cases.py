@@ -55,10 +55,35 @@ class ListConnections:
                 connections=[
                     ConnectionView(c, self.uow.accounts.of_connection(c.id))
                     for c in self.uow.connections.all()
-                    if c.id is not None
+                    if c.id is not None and c.status != "revoked"
                 ],
                 detached_accounts=self.uow.accounts.detached(),
             )
+
+
+@dataclass
+class RemoveConnection:
+    """Closes the bank session, revokes the connection and detaches its accounts (their transactions stay)."""
+
+    uow: UnitOfWork
+    provider: BankingProvider
+
+    def __call__(self, connection_id: int) -> None:
+        with self.uow:
+            connection = self.uow.connections.by_id(connection_id)
+            if connection is None:
+                raise ConnectionNotFound()
+            try:
+                self.provider.delete_session(connection.session_id)
+            except (ProviderError, ProviderNotConfigured) as error:
+                # The user asked to remove it: do so locally even if the bank session could not be closed
+                log.warning("No se pudo cerrar la sesión de %s: %s", connection.aspsp_name, error)
+            connection.revoke()
+            self.uow.connections.save(connection)
+            for account in self.uow.accounts.of_connection(connection_id):
+                account.detach()
+                self.uow.accounts.save(account)
+            self.uow.commit()
 
 
 @dataclass
@@ -254,6 +279,7 @@ class BankingServices:
     """The banking use cases bound to one unit of work."""
 
     list_connections: ListConnections
+    remove_connection: RemoveConnection
     list_available_banks: ListAvailableBanks
     start_authorization: StartAuthorization
     complete_authorization: CompleteAuthorization
