@@ -4,7 +4,7 @@ TDD: write the scenario test first and see it fail for the right reason. Commit 
 
 ## 1. Pending edits
 
-- [ ] 1.1 Tests for «Pending transaction is still pending» (flipped), «Edits survive booking» and «No matching booked transaction», then `pop_pending()`, `inherit_edits()` and its use in `Ingest`; unit tests for the matching edge cases (closest date, each pending once, ±3 days); verify and mutation-check
+- [x] 1.1 Tests for «Pending transaction is still pending» (flipped), «Edits survive booking» and «No matching booked transaction», then `pop_pending()`, `inherit_edits()` and its use in `Ingest`; unit tests for the matching edge cases (closest date, each pending once, ±3 days); verify and mutation-check
 
 ## 2. Currencies
 
