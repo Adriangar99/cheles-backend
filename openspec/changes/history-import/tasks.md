@@ -13,9 +13,9 @@ invented (never the owner's export); the real export is only used for a final ma
 
 ## 3. Plan and import
 
-- [ ] 3.1 Category resolution (equivalence table, name, rules), with the category names served by categorization through its public API («Built-in category», «Same name», «Own category», «MoneyLover transfer»)
-- [ ] 3.2 `PlanImport`: targets, cutoff against the bank, already imported, balance adjustments, unmatched categories; `POST /api/imports/preview` («Wallet onto a bank account», «Wallet onto a new account», «Wallet not imported», «Unknown account», «File too large», «Adjustment row»)
-- [ ] 3.3 `POST /api/imports`: new accounts through banking's public API, store, counts («Import into a new account», «Import twice», «Newer export»)
+- [x] 3.1 Category resolution (equivalence table, name, rules), with the category names served by categorization through its public API («Built-in category», «Same name», «Own category», «MoneyLover transfer»)
+- [x] 3.2 `PlanImport`: targets, cutoff against the bank, already imported, balance adjustments, unmatched categories; `POST /api/imports/preview` («Wallet onto a bank account», «Wallet onto a new account», «Wallet not imported», «Unknown account», «File too large», «Adjustment row»)
+- [x] 3.3 `POST /api/imports`: new accounts through banking's public API, store, counts («Import into a new account», «Import twice», «Newer export»)
 
 ## 4. Contract and verification
 

@@ -353,3 +353,26 @@ def test_unmatched_categories_are_listed(client: TestClient) -> None:
     result = preview(client, content, {})
 
     assert result["unmatched_categories"] == [{"name": "Ahorro", "rows": 2}, {"name": "Invertir", "rows": 1}]
+
+
+def test_names_match_ignoring_accents(client: TestClient, db: Session, bank_account: int) -> None:
+    """Requirement detail: a MoneyLover category matches a Cheles one with the same name ignoring accents."""
+    transaction = import_one(client, db, "nomina", amount="2000.00")
+
+    assert (category_of(db, transaction), transaction.category_manual) == ("Nómina", True)
+
+
+def test_imported_history_does_not_move_the_sync_window(
+    client: TestClient, db: Session, fake_bank: FakeEnableBanking
+) -> None:
+    """Requirement detail: the bank is read from its own latest transaction, never from imported history."""
+    login(client, db)
+    connection_id = connect_bank(client, fake_bank, [FakeAccount(uid="empty", name="Nómina")])
+    account_id = db.scalars(select(Account.id).where(Account.eb_uid == "empty")).one()
+    client.post("/api/imports", json=body(export(row("01/10/2026")), {"Cuenta Principal": account_id}))
+    fake_bank.calls.clear()
+
+    client.post(f"/api/banks/{connection_id}/sync")
+
+    [(_, date_from)] = fake_bank.calls_to("get_transactions")
+    assert date_from < date(2026, 9, 1)
