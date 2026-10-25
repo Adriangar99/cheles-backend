@@ -74,9 +74,9 @@ class PlainHasher:
     def hash(self, password: str) -> str:
         return f"hashed:{password}"
 
-    def verify(self, password_hash: str, password: str) -> bool:
+    def verify(self, password_hash: str | None, password: str) -> bool:
         self.verified.append(password)
-        return password_hash == f"hashed:{password}"
+        return password_hash is not None and password_hash == f"hashed:{password}"
 
 
 class FixedTotp:
@@ -88,8 +88,8 @@ class FixedTotp:
     def provisioning_uri(self, secret: str, username: str) -> str:
         return f"otpauth://totp/Cheles:{username}?secret={secret}&issuer=Cheles"
 
-    def verify(self, secret: str, code: str) -> bool:
-        return code == "123456"
+    def verify(self, secret: str | None, code: str) -> bool:
+        return secret is not None and code == "123456"
 
 
 @dataclass
