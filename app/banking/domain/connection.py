@@ -16,6 +16,7 @@ class PendingAuthorization:
     state: str
     aspsp_name: str
     aspsp_country: str
+    started_at: datetime
 
 
 @dataclass
@@ -31,6 +32,10 @@ class BankConnection:
 
     def consent_expired(self, now: datetime) -> bool:
         return self.valid_until < now
+
+    def revoke(self) -> None:
+        """Removed by the user: never listed or synced again."""
+        self.status = "revoked"
 
     def record_sync_error(self, error: ProviderError) -> None:
         self.last_error = str(error)[:LAST_ERROR_MAX_LENGTH]

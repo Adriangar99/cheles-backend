@@ -43,6 +43,11 @@ class Account:
     balance_at: datetime | None = None
     id: AccountId | None = None
 
+    def detach(self) -> None:
+        """Its connection was removed: it keeps its data, role and IBAN, and a reconnection can link it again."""
+        self.connection_id = None
+        self.eb_uid = None
+
     @property
     def display_name(self) -> str:
         return self.alias or self.name

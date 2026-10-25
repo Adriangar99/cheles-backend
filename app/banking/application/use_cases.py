@@ -25,6 +25,8 @@ from app.shared.money import Money
 
 log = logging.getLogger(__name__)
 
+PENDING_AUTHORIZATION_TTL = timedelta(hours=1)
+
 
 @dataclass(frozen=True)
 class ConnectionView:
@@ -55,10 +57,35 @@ class ListConnections:
                 connections=[
                     ConnectionView(c, self.uow.accounts.of_connection(c.id))
                     for c in self.uow.connections.all()
-                    if c.id is not None
+                    if c.id is not None and c.status != "revoked"
                 ],
                 detached_accounts=self.uow.accounts.detached(),
             )
+
+
+@dataclass
+class RemoveConnection:
+    """Closes the bank session, revokes the connection and detaches its accounts (their transactions stay)."""
+
+    uow: UnitOfWork
+    provider: BankingProvider
+
+    def __call__(self, connection_id: int) -> None:
+        with self.uow:
+            connection = self.uow.connections.by_id(connection_id)
+            if connection is None:
+                raise ConnectionNotFound()
+            try:
+                self.provider.delete_session(connection.session_id)
+            except (ProviderError, ProviderNotConfigured) as error:
+                # The user asked to remove it: do so locally even if the bank session could not be closed
+                log.warning("No se pudo cerrar la sesión de %s: %s", connection.aspsp_name, error)
+            connection.revoke()
+            self.uow.connections.save(connection)
+            for account in self.uow.accounts.of_connection(connection_id):
+                account.detach()
+                self.uow.accounts.save(account)
+            self.uow.commit()
 
 
 @dataclass
@@ -86,7 +113,12 @@ class StartAuthorization:
     def __call__(self, bank_name: str, country: str) -> str:
         state = self.states.new_state()
         with self.uow:
-            self.uow.pending.add(PendingAuthorization(state=state, aspsp_name=bank_name, aspsp_country=country))
+            now = self.clock.now()
+            # Flows abandoned or failed at the bank never reach the callback; forget them after a while
+            self.uow.pending.delete_started_before(now - PENDING_AUTHORIZATION_TTL)
+            self.uow.pending.add(
+                PendingAuthorization(state=state, aspsp_name=bank_name, aspsp_country=country, started_at=now)
+            )
             self.uow.commit()
         valid_until = self.clock.now() + timedelta(days=self.settings.consent_days)
         return self.provider.start_auth(bank_name, country, state, self.settings.redirect_url, valid_until)
@@ -105,6 +137,9 @@ class SyncConnection:
             connection = self.uow.connections.by_id(connection_id)
             if connection is None:
                 raise ConnectionNotFound()
+            # The bank already rejected (or the user removed) this consent: report it without calling the provider
+            if connection.status != "active":
+                return SyncResult(0, connection.status, connection.last_error)
             if connection.consent_expired(self.clock.now()):
                 connection.status = "expired"
                 self.uow.connections.save(connection)
@@ -251,6 +286,7 @@ class BankingServices:
     """The banking use cases bound to one unit of work."""
 
     list_connections: ListConnections
+    remove_connection: RemoveConnection
     list_available_banks: ListAvailableBanks
     start_authorization: StartAuthorization
     complete_authorization: CompleteAuthorization

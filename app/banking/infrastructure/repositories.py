@@ -1,4 +1,5 @@
 from collections.abc import Callable, Collection
+from datetime import datetime
 from types import TracebackType
 from typing import Self
 
@@ -122,15 +123,23 @@ class SqlPendingAuthorizationRepository:
 
     def add(self, pending: PendingAuthorization) -> None:
         self.db.add(
-            PendingAuthRow(state=pending.state, aspsp_name=pending.aspsp_name, aspsp_country=pending.aspsp_country)
+            PendingAuthRow(
+                state=pending.state,
+                aspsp_name=pending.aspsp_name,
+                aspsp_country=pending.aspsp_country,
+                created_at=pending.started_at,
+            )
         )
 
     def get(self, state: str) -> PendingAuthorization | None:
         row = self.db.get(PendingAuthRow, state)
-        return PendingAuthorization(row.state, row.aspsp_name, row.aspsp_country) if row else None
+        return PendingAuthorization(row.state, row.aspsp_name, row.aspsp_country, row.created_at) if row else None
 
     def delete(self, state: str) -> None:
         self.db.execute(delete(PendingAuthRow).where(PendingAuthRow.state == state))
+
+    def delete_started_before(self, cutoff: datetime) -> None:
+        self.db.execute(delete(PendingAuthRow).where(PendingAuthRow.created_at < cutoff))
 
 
 class SqlUnitOfWork:

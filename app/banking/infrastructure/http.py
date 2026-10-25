@@ -37,6 +37,7 @@ def _serialize_connection(view: ConnectionView) -> dict[str, Any]:
     return {
         "id": c.id,
         "bank": c.aspsp_name,
+        "country": c.aspsp_country,
         "status": c.status,
         "valid_until": c.valid_until,
         "last_synced_at": c.last_synced_at,
@@ -59,6 +60,7 @@ class AccountOut(BaseModel):
 class ConnectionOut(BaseModel):
     id: int
     bank: str
+    country: str
     status: Literal["active", "expired", "revoked"]
     valid_until: JsonDateTime
     last_synced_at: JsonDateTime | None
@@ -154,6 +156,19 @@ def bank_callback(
 ) -> Response:
     connected = services.complete_authorization(code, state, error)
     return Response(status_code=303, headers={"Location": f"/bancos?{'connected=1' if connected else 'error=1'}"})
+
+
+@router.delete("/api/banks/{connection_id}", status_code=204, response_class=Response)
+def remove_connection(
+    connection_id: int,
+    services: BankingServices = Depends(banking_services),
+    _: AuthenticatedUser = Depends(require_user),
+) -> Response:
+    try:
+        services.remove_connection(connection_id)
+    except ConnectionNotFound:
+        raise HTTPException(404) from None
+    return Response(status_code=204)
 
 
 @router.post("/api/banks/{connection_id}/sync", response_model=SyncOut)
