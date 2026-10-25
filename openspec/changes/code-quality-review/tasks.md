@@ -8,7 +8,7 @@ TDD: write the scenario test first and see it fail; refactors keep every test gr
 
 ## 2. Invariants and literals
 
-- [ ] 2.1 Replace the four production `assert` with `saved_id()` raising `UnsavedEntity`, and the repository `cast()` of stored literals with `parse_literal()`; verify ruff, mypy, import-linter and the full suite pass
+- [x] 2.1 Replace the four production `assert` with `saved_id()` raising `UnsavedEntity`, and the repository `cast()` of stored literals with `parse_literal()`; verify ruff, mypy, import-linter and the full suite pass
 
 ## 3. Tests
 

@@ -7,7 +7,7 @@ from app.categorization.domain.category import Category, CategoryLabel
 from app.categorization.domain.errors import UnknownCategory
 from app.categorization.domain.policy import CategorizationPolicy
 from app.categorization.domain.rule import DEFAULT_RULE_PRIORITY, USER_RULE_PRIORITY, Rule
-from app.shared.ids import CategoryId
+from app.shared.ids import CategoryId, saved_id
 
 
 @dataclass
@@ -23,9 +23,9 @@ class SeedDefaultCatalog:
             for name, kind, icon, color, patterns in DEFAULT_CATALOG:
                 category = Category(name=name, kind=kind, icon=icon, color=color)
                 self.uow.categories.add(category)
-                assert category.id is not None
+                category_id = saved_id(category.id, "Category")
                 for pattern in patterns:
-                    self.uow.rules.add(Rule(pattern=pattern, category_id=category.id, priority=DEFAULT_RULE_PRIORITY))
+                    self.uow.rules.add(Rule(pattern=pattern, category_id=category_id, priority=DEFAULT_RULE_PRIORITY))
             self.uow.commit()
 
 

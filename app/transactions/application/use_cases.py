@@ -148,7 +148,8 @@ class EditTransaction:
             self.reprocess_all()
             with self.uow:
                 refreshed = self.uow.transactions.by_id(transaction_id)
-            assert refreshed is not None
+            if refreshed is None:
+                raise TransactionNotFound()
             transaction = refreshed
         names = self.own_accounts.display_names({transaction.account_id})
         return TransactionView(transaction, names.get(transaction.account_id, ""))

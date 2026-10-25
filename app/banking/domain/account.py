@@ -1,11 +1,12 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal
+from typing import Literal, get_args
 
 from app.shared.ids import AccountId
 from app.shared.money import Money
 
 AccountRole = Literal["main", "savings", "excluded"]
+ACCOUNT_ROLES: tuple[AccountRole, ...] = get_args(AccountRole)
 
 
 @dataclass(frozen=True)

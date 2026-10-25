@@ -1,9 +1,10 @@
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, get_args
 
 from app.shared.ids import CategoryId
 
 CategoryKind = Literal["expense", "income"]
+CATEGORY_KINDS: tuple[CategoryKind, ...] = get_args(CategoryKind)
 
 
 @dataclass

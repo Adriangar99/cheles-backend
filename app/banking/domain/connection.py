@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal
+from typing import Literal, get_args
 
 from app.banking.domain.errors import ProviderError
 
 ConnectionStatus = Literal["active", "expired", "revoked"]
+CONNECTION_STATUSES: tuple[ConnectionStatus, ...] = get_args(ConnectionStatus)
 LAST_ERROR_MAX_LENGTH = 1024
 
 

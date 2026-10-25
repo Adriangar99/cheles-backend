@@ -20,7 +20,7 @@ from app.banking.domain.events import AccountIbanChanged
 from app.banking.domain.reconnection import IncomingAccount, link_account
 from app.banking.domain.sync_policy import pick_balance, window_start
 from app.shared.events import EventPublisher
-from app.shared.ids import AccountId
+from app.shared.ids import AccountId, saved_id
 from app.shared.money import Money
 
 log = logging.getLogger(__name__)
@@ -114,7 +114,7 @@ class SyncConnection:
             try:
                 for account in self.uow.accounts.of_connection(connection_id):
                     if account.eb_uid:
-                        total += self._sync_account(account)
+                        total += self._sync_account(account, account.eb_uid)
                 connection.last_error = None
             except ProviderError as error:
                 log.warning("Error sincronizando %s: %s", connection.aspsp_name, error)
@@ -124,15 +124,15 @@ class SyncConnection:
             self.uow.commit()
             return SyncResult(total, connection.status, connection.last_error)
 
-    def _sync_account(self, account: Account) -> int:
-        assert account.id is not None and account.eb_uid is not None
+    def _sync_account(self, account: Account, eb_uid: str) -> int:
+        account_id = saved_id(account.id, "Account")
         date_from = window_start(
-            self.transactions.latest_booked_date(account.id), self.clock.today(), self.settings.initial_history_days
+            self.transactions.latest_booked_date(account_id), self.clock.today(), self.settings.initial_history_days
         )
         # Both provider calls happen before writing, so a failure stores nothing for this account
-        raws = self.provider.get_transactions(account.eb_uid, date_from)
-        balances = self.provider.get_balances(account.eb_uid)
-        new = self.transactions.ingest(account.id, raws)
+        raws = self.provider.get_transactions(eb_uid, date_from)
+        balances = self.provider.get_balances(eb_uid)
+        new = self.transactions.ingest(account_id, raws)
         amount = pick_balance(balances)
         account.balance = Money(amount, account.currency) if amount is not None else None
         account.balance_at = self.clock.now()
@@ -181,16 +181,15 @@ class CompleteAuthorization:
                 valid_until=datetime.fromisoformat(session["access"]["valid_until"]),
             )
             self.uow.connections.save(connection)
-            assert connection.id is not None
+            connection_id = saved_id(connection.id, "BankConnection")
             known = self.uow.accounts.all()
             for payload in session["accounts"]:
-                account = link_account(IncomingAccount.from_session(payload), connection.id, pending.aspsp_name, known)
+                account = link_account(IncomingAccount.from_session(payload), connection_id, pending.aspsp_name, known)
                 self.uow.accounts.save(account)
                 if account not in known:
                     known.append(account)
             self.uow.pending.delete(pending.state)
             self.uow.commit()
-            connection_id = connection.id
         try:
             self.sync_connection(connection_id)
         except Exception:
