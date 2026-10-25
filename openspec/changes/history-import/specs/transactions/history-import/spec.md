@@ -34,7 +34,8 @@ of the file, so the same row in a newer export gets the same id and identical ro
 `POST /api/imports/preview` with the file (base64) and a map from wallet to target (an account id, `new` or nothing)
 SHALL return, per wallet, its name, number of rows, first and last date, target, and how many rows would be imported,
 skipped because the target account's bank transactions start on or before their date (with that date), and already
-imported; and the MoneyLover categories that have no equivalent, with their number of rows. It writes nothing.
+imported, and how many are balance adjustments; and the MoneyLover categories that have no equivalent, with their
+number of rows. It writes nothing.
 
 #### Scenario: Wallet onto a bank account
 - **WHEN** «Cuenta Principal» has rows from 2025-05-05 to 2026-10-25 and is sent to an account whose earliest bank
@@ -71,11 +72,19 @@ description (or the category name when there is no note) and appear everywhere b
 - **WHEN** the same file and targets are imported again
 - **THEN** nothing new is stored and every row is counted as already imported
 
+### Requirement: Balance adjustments
+Rows whose note is «Ajuste» (ignoring case and surrounding spaces) SHALL NOT be imported; the preview counts them per
+wallet.
+
+#### Scenario: Adjustment row
+- **WHEN** «Cuenta Principal» has 10 rows, 2 of them with the note «Ajuste», and goes to a new account
+- **THEN** the preview counts 8 to import and 2 adjustments, and importing stores 8
+
 ### Requirement: Categories of imported rows
 An imported row SHALL get its category from the equivalence table of MoneyLover's built-in categories, else from a
 Cheles category with the same name ignoring case and accents (both kept as manual), else from the automatic rules on
-its description. «Transferencia entrante» and «Transferencia saliente» rows become transfers between own accounts
-(manual kind, no category).
+its description. Every imported row is an ordinary movement, including «Transferencia entrante» and «Transferencia
+saliente» rows; the user marks moves between own accounts as transfers afterwards.
 
 #### Scenario: Built-in category
 - **WHEN** a row of «Comer en casa o fuera» is imported
@@ -90,6 +99,6 @@ its description. «Transferencia entrante» and «Transferencia saliente» rows 
   Supermercado
 - **THEN** its category is «Supermercado», automatic
 
-#### Scenario: Transfer
-- **WHEN** a row of «Transferencia saliente» is imported
-- **THEN** it is a transfer with a manual kind and no category
+#### Scenario: MoneyLover transfer
+- **WHEN** a row of «Transferencia entrante» of +15.00 with note «Bizum Toni cine» is imported
+- **THEN** it is an ordinary income movement whose category is «Bizum recibido», automatic

@@ -8,12 +8,18 @@ The owner's export (`~/Downloads/628e…csv`, not versioned) has 1338 rows from 
 like `-47.80`. `Id` counts rows of that export (1 is the newest) and changes on the next export.
 
 Decisions taken with the owner: skip by date cutoff against the bank; import from «bancos» with a preview; categories
-by a fixed equivalence table, then name, then rules.
+by a fixed equivalence table, then name, then rules; MoneyLover transfers imported as ordinary movements; balance
+adjustments not imported.
+
+The export's 282 «Transferencia entrante/saliente» rows mix two things: 45 pairs that move money between the owner's
+wallets (same amount out of one and into another within 3 days) and 192 unpaired rows, almost all Bizums with other
+people («bizum papá plataformas», «bizum toni cine»…), plus 14 «Ajuste» rows. The owner chose to import every transfer
+row as ordinary income or spending and mark the moves between wallets as ⇄ by hand.
 
 ## Goals / Non-Goals
 
 **Goals:** months before the bank connection appear in every screen; importing twice, or a newer export, does not
-duplicate; nothing the bank brought is duplicated; transfers between own wallets do not count as income or spending.
+duplicate; nothing the bank brought is duplicated; money exchanged with other people (Bizums) counts.
 
 **Non-Goals:** other formats now; a UI to edit equivalences; balances for imported accounts.
 
@@ -44,7 +50,14 @@ imported. Unknown account ids → 422.
 `source = import`, status `BOOK`, `counterparty = None`, `description` = note or, when empty, the MoneyLover category,
 `raw` = the row as read (for reference). Category: equivalence table → same name (casefold, accents removed) → rules on
 the description; the first two are stored as manual (they come from the user's own choice in MoneyLover), the third as
-automatic. «Transferencia entrante»/«Transferencia saliente» → `kind = transfer`, `kind_manual = true`, no category.
+automatic. Every row is `kind = normal`: «Transferencia entrante»/«Transferencia saliente» have no equivalent, so their
+category comes from the rules (an incoming «bizum…» gets «Bizum recibido», like bank transactions) or the fallback.
+Pairing them automatically was considered and rejected by the owner.
+
+### Balance adjustments
+Rows whose note is «Ajuste» (trimmed, ignoring case) are MoneyLover balance corrections, not money: they are not
+imported and the preview counts them per wallet (`adjustments`). Cheles keeps no balance for imported accounts, so
+nothing needs them.
 
 Equivalence table (MoneyLover built-ins → Cheles): Salario→Nómina; Alquiler, Mantenimiento del hogar→Vivienda;
 Comida y bebida→Supermercado; Comer en casa o fuera→Restaurantes; Gasolina, Mantenimiento de vehículos→Transporte;

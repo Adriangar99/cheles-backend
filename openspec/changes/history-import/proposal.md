@@ -13,12 +13,15 @@ bank connection, without duplicating what the bank already brought.
   on every export, so each row gets a stable id from its content.
 - **Preview** `POST /api/imports/preview`: per MoneyLover wallet (`Cuenta`), how many rows, their date range, and with the
   chosen target account how many would be imported, how many fall on or after the account's first bank transaction
-  (skipped: the bank already has them) and how many were imported before; plus the MoneyLover categories without an
+  (skipped: the bank already has them), how many were imported before and how many are balance adjustments; plus the MoneyLover categories without an
   equivalent. Writes nothing.
 - **Import** `POST /api/imports`: the same input; creates an account without a bank for wallets sent to «new», stores the
   rows as imported transactions and returns the counts.
 - **Categories**: a fixed equivalence table for MoneyLover's built-in categories, then a match by name (ignoring case
-  and accents), then the automatic rules on the note. «Transferencia entrante/saliente» become transfers (⇄).
+  and accents), then the automatic rules on the note. «Transferencia entrante/saliente» are imported as ordinary
+  income or spending (the owner used them both for moves between wallets and for Bizums with other people, and marks
+  the moves as ⇄ by hand afterwards).
+- **Balance adjustments** (rows whose note is «Ajuste») are not imported; the preview counts them.
 - **Reprocessing** keeps imported transactions as imported (there is no bank payload to rebuild them from); their
   automatic category is recomputed.
 - Transactions get a `source` (`bank` or `import`), migration `0003_transaction_source`.
