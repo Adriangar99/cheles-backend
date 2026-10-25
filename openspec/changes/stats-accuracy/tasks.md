@@ -8,11 +8,11 @@ TDD: write the scenario test first and see it fail for the right reason. Commit 
 
 ## 2. Currencies
 
-- [ ] 2.1 Tests for «Another currency», «Account in another currency», «Everything in euros» and «Dollars left out», then publish the currency in both read models and filter in stats, adding `other_currencies`; verify and mutation-check
+- [x] 2.1 Tests for «Another currency», «Account in another currency», «Everything in euros» and «Dollars left out», then publish the currency in both read models and filter in stats, adding `other_currencies`; verify and mutation-check
 
 ## 3. Verification
 
-- [ ] 3.1 Regenerate `openapi.json`; ruff, mypy, import-linter, full suite with coverage ≥ 97, spec-coverage meta-test; open the PR and verify CI
+- [x] 3.1 Regenerate `openapi.json`; ruff, mypy, import-linter, full suite with coverage ≥ 97, spec-coverage meta-test; open the PR and verify CI
 
 ## Workflow follow-up
 
