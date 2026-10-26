@@ -12,8 +12,9 @@ links to them, and every scenario there has a test.
 
 ## Banking — [bank connection](../openspec/specs/banking/bank-connection/spec.md), [bank sync](../openspec/specs/banking/bank-sync/spec.md), [accounts](../openspec/specs/banking/accounts/spec.md)
 
-- Connect a bank through Enable Banking (180-day consent), re-linking known accounts on reconnection; remove a
-  connection (its accounts stay, without a bank).
+- Connect a bank through Enable Banking (180-day consent), re-linking known accounts on reconnection; the first sync
+  runs in the background, so the bank's redirect is answered at once. Remove a connection (its accounts stay, without
+  a bank).
 - Automatic sync at 7:00 and 19:00 and on demand; incremental reads with an overlap window; balances; expired
   consents and provider errors recorded on the connection.
 - Account roles (`main`, `savings`, `excluded`), alias and manual IBAN; IBAN changes reprocess every transaction.
@@ -24,6 +25,8 @@ links to them, and every scenario there has a test.
 - Transactions are stored exactly as the bank returns them (`raw`) and normalized (date, amount, counterparty,
   description); duplicates are detected by bank ids or a content hash; undated ones are skipped.
 - Transfers between your own accounts (by IBAN) count as neither expense nor income.
+- Each transaction has a readable `title`: «Traspaso a cuenta» / «Traspaso desde cuenta» for own transfers, the
+  counterparty, or the merchant taken from BBVA's `sector // operation // detail` description.
 - Listing with month, search, category, account and kind filters; manual category, manual transfer mark (⇄) and note,
   all kept by syncs and reprocessing, and carried over when a pending transaction is booked.
 - Reprocessing recomputes everything from `raw` without calling the bank; imported transactions stay as imported.
