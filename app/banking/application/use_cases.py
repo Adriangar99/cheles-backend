@@ -189,25 +189,26 @@ class SyncAll:
 
 @dataclass
 class CompleteAuthorization:
-    """Handles the bank's redirect: creates the connection, links its accounts and runs a first sync.
+    """Handles the bank's redirect: creates the connection and links its accounts. The first sync is left to
+    `FirstSync`, so the redirect does not wait for the bank's history.
 
-    Returns False (and changes nothing) when the bank reported an error, data is missing or the session fails.
+    Returns the new connection's id, or None (changing nothing) when the bank reported an error, data is missing or the
+    session fails.
     """
 
     uow: UnitOfWork
     provider: BankingProvider
-    sync_connection: SyncConnection
 
-    def __call__(self, code: str | None, state: str | None, error: str | None) -> bool:
+    def __call__(self, code: str | None, state: str | None, error: str | None) -> int | None:
         with self.uow:
             pending = self.uow.pending.get(state) if state else None
             if error or not code or pending is None:
-                return False
+                return None
             try:
                 session = self.provider.create_session(code)
             except (ProviderError, ProviderNotConfigured) as e:
                 log.warning("Error creando sesión: %s", e)
-                return False
+                return None
 
             connection = BankConnection(
                 aspsp_name=pending.aspsp_name,
@@ -225,11 +226,20 @@ class CompleteAuthorization:
                     known.append(account)
             self.uow.pending.delete(pending.state)
             self.uow.commit()
+        return connection_id
+
+
+@dataclass
+class FirstSync:
+    """Reads a new connection for the first time. Nobody waits for it, so any failure is only logged."""
+
+    sync_connection: SyncConnection
+
+    def __call__(self, connection_id: int) -> None:
         try:
             self.sync_connection(connection_id)
         except Exception:
             log.exception("Falló la primera sincronización")
-        return True
 
 
 @dataclass
@@ -305,6 +315,7 @@ class BankingServices:
     list_available_banks: ListAvailableBanks
     start_authorization: StartAuthorization
     complete_authorization: CompleteAuthorization
+    first_sync: FirstSync
     sync_connection: SyncConnection
     sync_all: SyncAll
     update_account: UpdateAccount

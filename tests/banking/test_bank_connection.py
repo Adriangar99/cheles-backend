@@ -7,11 +7,13 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 import time_machine
+from fastapi import BackgroundTasks
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.banking.infrastructure.enable_banking import EnableBankingClient
+from app.banking.infrastructure.http import bank_callback
 from app.banking.infrastructure.orm import AccountRow as Account
 from app.banking.infrastructure.orm import BankConnectionRow as BankConnection
 from app.banking.infrastructure.orm import PendingAuthRow as PendingAuth
@@ -112,6 +114,27 @@ def test_authorization_completed(client: TestClient, db: Session, fake_bank: Fak
     accounts = db.scalars(select(Account).order_by(Account.id)).all()
     assert [(a.eb_uid, a.connection_id) for a in accounts] == [("uid-1", connection.id), ("uid-2", connection.id)]
     assert db.scalars(select(PendingAuth)).all() == []
+
+
+@pytest.mark.usefixtures("user")
+def test_the_response_does_not_wait_for_the_first_sync(
+    client: TestClient, db: Session, container: Container, fake_bank: FakeEnableBanking
+) -> None:
+    """Scenario: The response does not wait for the first sync"""
+    state = start_authorization(client)
+    fake_bank.add_session("code-1", [FakeAccount(uid="uid-1")])
+    fake_bank.transactions["uid-1"] = [raw_tx("12.50", reference="r1")]
+    background = BackgroundTasks()
+
+    # The route itself, so the work it leaves for after the response can be told apart from the response
+    response = bank_callback(code="code-1", state=state, background=background, services=container.banking())
+
+    assert (response.status_code, response.headers["location"]) == (303, "/bancos?connected=1")
+    assert fake_bank.calls_to("get_transactions") == []
+    for task in background.tasks:
+        task.func(*task.args, **task.kwargs)
+    assert len(db.scalars(select(Transaction)).all()) == 1
+    assert db.scalars(select(BankConnection)).one().last_synced_at is not None
 
 
 @pytest.mark.usefixtures("user")

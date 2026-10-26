@@ -19,6 +19,7 @@ from app.banking.application.use_cases import (
     BankingServices,
     CompleteAuthorization,
     CreateAccountWithoutBank,
+    FirstSync,
     ListAvailableBanks,
     ListConnections,
     OwnAccountIbans,
@@ -184,9 +185,8 @@ class Container:
             start_authorization=StartAuthorization(
                 uow=uow, provider=self.banking_provider, settings=settings, clock=clock, states=_UrlSafeStates()
             ),
-            complete_authorization=CompleteAuthorization(
-                uow=uow, provider=self.banking_provider, sync_connection=sync_connection
-            ),
+            complete_authorization=CompleteAuthorization(uow=uow, provider=self.banking_provider),
+            first_sync=FirstSync(sync_connection=sync_connection),
             sync_connection=sync_connection,
             sync_all=SyncAll(uow=uow, sync_connection=sync_connection),
             update_account=UpdateAccount(uow=uow, events=self.events),
