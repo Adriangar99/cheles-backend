@@ -14,6 +14,10 @@ from app.transactions.domain.counterparty import CounterpartyIban
 from app.transactions.domain.errors import UndatedTransaction
 
 DESCRIPTION_MAX_LENGTH = 1024
+REMITTANCE_SEPARATOR = " // "
+# Detail of a BBVA card payment: merchant (25), city (13) and country (2), each padded with spaces
+CARD_DETAIL_LENGTH = 40
+CARD_MERCHANT_LENGTH = 25
 
 
 @dataclass(frozen=True)
@@ -59,3 +63,16 @@ def normalize(raw: dict[str, Any]) -> NormalizedTransaction:
         counterparty_iban=CounterpartyIban.parse((raw.get(party_account) or {}).get("iban")),
         description=description[:DESCRIPTION_MAX_LENGTH],
     )
+
+
+def remittance_title(description: str) -> str | None:
+    """The readable part of a `sector // operation // detail` description: the merchant in the detail, or the operation
+    when the detail is only a reference number. None when the description has another format."""
+    segments = description.split(REMITTANCE_SEPARATOR)
+    if len(segments) < 3:
+        return None
+    detail = segments[-1]
+    merchant = (detail[:CARD_MERCHANT_LENGTH] if len(detail) == CARD_DETAIL_LENGTH else detail).strip()
+    if any(c.isalpha() for c in merchant):
+        return merchant
+    return segments[-2].strip() or None
