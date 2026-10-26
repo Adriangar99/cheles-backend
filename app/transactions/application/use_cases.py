@@ -33,6 +33,7 @@ log = logging.getLogger(__name__)
 class TransactionView:
     transaction: Transaction
     account_name: str
+    title: str
 
 
 @dataclass(frozen=True)
@@ -132,7 +133,8 @@ class ListTransactions:
         with self.uow:
             found = self.uow.transactions.search(criteria)
         names = self.own_accounts.display_names({t.account_id for t in found})
-        return [TransactionView(t, names.get(t.account_id, "")) for t in found]
+        ibans = self.own_accounts.ibans()
+        return [TransactionView(t, names.get(t.account_id, ""), t.title(ibans)) for t in found]
 
 
 @dataclass
@@ -169,7 +171,8 @@ class EditTransaction:
                 raise TransactionNotFound()
             transaction = refreshed
         names = self.own_accounts.display_names({transaction.account_id})
-        return TransactionView(transaction, names.get(transaction.account_id, ""))
+        title = transaction.title(self.own_accounts.ibans())
+        return TransactionView(transaction, names.get(transaction.account_id, ""), title)
 
 
 @dataclass(frozen=True)

@@ -34,6 +34,7 @@ def _serialize(view: TransactionView) -> dict[str, Any]:
         "amount": t.amount.amount,
         "currency": t.amount.currency,
         "status": t.status,
+        "title": view.title,
         "counterparty": t.counterparty,
         "description": t.description,
         "kind": t.kind,
@@ -52,6 +53,7 @@ class TransactionOut(BaseModel):
     amount: JsonDecimal  # signed: negative means money going out
     currency: str
     status: str
+    title: str  # what to call it in lists; `description` is the detail
     counterparty: str | None
     description: str
     kind: Literal["normal", "transfer"]

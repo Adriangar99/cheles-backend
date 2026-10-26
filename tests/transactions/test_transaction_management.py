@@ -1,5 +1,7 @@
 """Characterization of `transactions/transaction-management`."""
 
+from datetime import date
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -9,6 +11,9 @@ from sqlalchemy.orm import Session
 
 from app.banking.infrastructure.orm import AccountRow as Account
 from app.categorization.infrastructure.orm import CategoryRow as Category
+from app.shared.ids import AccountId
+from app.shared.money import Money
+from app.transactions.domain.transaction import Transaction as DomainTransaction
 from app.transactions.infrastructure.orm import TransactionRow as Transaction
 from tests.fakes import FakeAccount, FakeEnableBanking
 from tests.helpers import connect_bank, login, raw_tx, stored_row
@@ -107,6 +112,7 @@ def test_listed_transaction(client: TestClient, db: Session) -> None:
         "amount": -12.5,
         "currency": "EUR",
         "status": "BOOK",
+        "title": "MERCADONA",
         "counterparty": "MERCADONA",
         "description": "",
         "kind": "normal",
@@ -123,6 +129,73 @@ def test_listed_transaction(client: TestClient, db: Session) -> None:
 def test_automatic_kind(client: TestClient) -> None:
     """Scenario: Automatic kind"""
     assert {t["kind_manual"] for t in listed(client)} == {False}
+
+
+# ---------- Readable title ----------
+
+OWN_IBAN = "ES0000000000000000000001"
+
+
+def bank_title(raw: dict[str, Any], own_ibans: set[str] | None = None) -> str:
+    return DomainTransaction.from_payload(AccountId(1), raw).title(own_ibans or set())
+
+
+def test_title_from_the_counterparty() -> None:
+    """Scenario: Title from the counterparty"""
+    assert bank_title(raw_tx("3.20", creditor="EXAMPLE MARKET")) == "EXAMPLE MARKET"
+
+
+def test_card_payment_without_counterparty() -> None:
+    """Scenario: Card payment without counterparty"""
+    description = "PAGO CON TARJETA EN GASOLINERAS // PAGO CON TARJETA // ACME FUEL                SOMECITY     ES"
+    transaction = DomainTransaction.from_payload(AccountId(1), raw_tx("47.80", remittance=[description]))
+
+    assert (transaction.title(set()), transaction.description) == ("ACME FUEL", description)
+
+
+def test_online_merchant() -> None:
+    """Scenario: Online merchant"""
+    raw = raw_tx("9.99", remittance=["PAGO CON TARJETA DE SERVICIOS VARIOS // OTROS // Example.com"])
+
+    assert bank_title(raw) == "Example.com"
+
+
+def test_last_segment_without_letters() -> None:
+    """Scenario: Last segment without letters"""
+    raw = raw_tx("250.00", remittance=["CARGO POR AMORTIZACION // AMORTIZACIÓN PRÉSTAMO // 0000-1111-22"])
+
+    assert bank_title(raw) == "AMORTIZACIÓN PRÉSTAMO"
+
+
+def test_transfer_between_own_accounts() -> None:
+    """Scenario: Transfer between own accounts"""
+    out = raw_tx("100.00", creditor="HOLDER NAME", creditor_iban=OWN_IBAN, remittance=["TRASPASO // A // HOLDER NAME"])
+    back = raw_tx("100.00", debit=False, debtor="HOLDER NAME", debtor_iban=OWN_IBAN)
+
+    assert [bank_title(raw, {OWN_IBAN}) for raw in (out, back)] == ["Traspaso a cuenta", "Traspaso desde cuenta"]
+
+
+def test_unstructured_description() -> None:
+    """Scenario: Unstructured description"""
+    assert bank_title(raw_tx("2000.00", debit=False, remittance=["NOMINA EMPRESA"])) == "NOMINA EMPRESA"
+
+
+def test_imported_transaction_title() -> None:
+    """Scenario: Imported transaction title"""
+    imported = DomainTransaction(
+        account_id=AccountId(1),
+        external_id="ml:dinner",
+        booking_date=date(2025, 5, 3),
+        amount=Money(Decimal("-30.00"), "EUR"),
+        status="BOOK",
+        counterparty=None,
+        counterparty_iban=None,
+        description="Cena con amigos // con // 1234",
+        raw={},
+        source="import",
+    )
+
+    assert imported.title(set()) == "Cena con amigos // con // 1234"
 
 
 # ---------- Manual category ----------

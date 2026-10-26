@@ -5,7 +5,12 @@ from typing import Any, Literal, Protocol, get_args
 
 from app.shared.ids import AccountId, CategoryId, TransactionId
 from app.shared.money import Money
-from app.transactions.domain.bank_payload import DESCRIPTION_MAX_LENGTH, NormalizedTransaction, normalize
+from app.transactions.domain.bank_payload import (
+    DESCRIPTION_MAX_LENGTH,
+    NormalizedTransaction,
+    normalize,
+    remittance_title,
+)
 from app.transactions.domain.moneylover import ImportedRow
 
 Kind = Literal["normal", "transfer"]
@@ -118,6 +123,16 @@ class Transaction:
         self.kind_manual = kind != self._automatic_kind(own_ibans)
         self.kind = kind
         self.derive(own_ibans, suggester)
+
+    def title(self, own_ibans: Collection[str]) -> str:
+        """What the movement is called in lists: a fixed text for transfers between own accounts (the counterparty
+        would be the user's own name), then the counterparty, then the readable part of the bank's description.
+        Imported movements keep their description, a note written by the user."""
+        if self.source == "import":
+            return self.description
+        if self._automatic_kind(own_ibans) == "transfer":
+            return "Traspaso a cuenta" if self.amount.amount < 0 else "Traspaso desde cuenta"
+        return self.counterparty or remittance_title(self.description) or self.description
 
     def _automatic_kind(self, own_ibans: Collection[str]) -> Kind:
         return "transfer" if self.counterparty_iban and self.counterparty_iban in own_ibans else "normal"
