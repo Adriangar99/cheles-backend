@@ -2,7 +2,7 @@
 
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
 from pydantic import BaseModel
 
 from app.banking.application.use_cases import BankingServices, ConnectionView
@@ -151,11 +151,17 @@ def bank_callback(
     code: str | None = None,
     state: str | None = None,
     error: str | None = None,
+    *,
+    background: BackgroundTasks,
     services: BankingServices = Depends(banking_services),
     _: AuthenticatedUser = Depends(require_user),
 ) -> Response:
-    connected = services.complete_authorization(code, state, error)
-    return Response(status_code=303, headers={"Location": f"/bancos?{'connected=1' if connected else 'error=1'}"})
+    connection_id = services.complete_authorization(code, state, error)
+    if connection_id is None:
+        return Response(status_code=303, headers={"Location": "/bancos?error=1"})
+    # A long history takes minutes to read: answer now and sync once the response is sent
+    background.add_task(services.first_sync, connection_id)
+    return Response(status_code=303, headers={"Location": "/bancos?connected=1"})
 
 
 @router.delete("/api/banks/{connection_id}", status_code=204, response_class=Response)
