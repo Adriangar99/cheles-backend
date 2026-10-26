@@ -4,7 +4,7 @@ TDD: write the scenario test first and see it fail for the right reason.
 
 ## 1. Title
 
-- [x] 1.1 Update «Listed transaction» to expect `title`, and test the «Readable title» scenarios (bank payloads through `Transaction.title`; the own-account transfer and the imported note through `GET /api/transactions`), then add `remittance_title` to the ACL, `Transaction.title(own_ibans)` and `title` in `TransactionView` and `TransactionOut`; verify the transactions tests pass
+- [x] 1.1 Update «Listed transaction» to expect `title`, and test the «Readable title» scenarios (as domain tests on `Transaction.title`; the HTTP field is covered by «Listed transaction»), then add `remittance_title` to the ACL, `Transaction.title(own_ibans)` and `title` in `TransactionView` and `TransactionOut`; verify the transactions tests pass
 
 ## 2. Verification
 
